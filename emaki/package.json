@@ -1,0 +1,42 @@
+{
+  "name": "emaki",
+  "version": "0.1.0",
+  "license": "MIT",
+  "type": "module",
+  "description": "A standalone canvas editor engine.",
+  "engines": {
+    "node": "^22.23.4 || ^24.22.1 || ^26.12.1"
+  },
+  "files": [
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "exports": {
+    ".": "./src/index.ts",
+    "./engine": "./src/engine.ts",
+    "./diff": "./src/diff/index.ts",
+    "./json": "./src/language/json.ts"
+  },
+  "scripts": {
+    "check": "tsc --noEmit",
+    "test": "vitest run",
+    "build": "vite build",
+    "dev": "vite",
+    "perf": "node scripts/perf.mjs",
+    "e2e": "node scripts/e2e.mjs"
+  },
+  "peerDependencies": {
+    "@codemirror/state": "6.7.6",
+    "@codemirror/commands": "6.11.1"
+  },
+  "devDependencies": {
+    "@codemirror/state": "6.7.6",
+    "@codemirror/commands": "6.11.1",
+    "typescript": "7.0.2",
+    "vite": "8.3.1",
+    "vitest": "5.0.2",
+    "jsdom": "30.1.1",
+    "playwright": "1.62.1"
+  }
+}

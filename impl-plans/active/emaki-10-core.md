@@ -158,9 +158,19 @@ None. These are read-only sources to copy from:
   | `perf` | `node scripts/perf.mjs` |
   | `e2e` | `node scripts/e2e.mjs` |
 
-**Lockfile.** Generate `emaki/package-lock.json` with
-`cd emaki && npm install --prefer-offline`. If a package is missing from
-the cache, stop and report. Never change versions.
+**Lockfile.** Operator amendment (after session 596): the Codex sandbox has
+no network, and the npm cache lacked registry metadata for a lockfile-less
+install. The operator therefore generated `emaki/package-lock.json` and
+`emaki/node_modules` outside the sandbox from the `package.json` above
+(exact pins verified: @codemirror/state 6.7.6, @codemirror/commands 6.11.1,
+typescript 7.0.2, vite 8.3.1, vitest 5.0.2, jsdom 30.1.1, playwright
+1.62.1). The lockfile is committed and counts as T1's lockfile deliverable.
+Do not regenerate it, do not run `npm install` again, and do not change
+`dependencies`/`devDependencies`/`peerDependencies`; use the existing
+`emaki/node_modules`. `npm ci --prefer-offline` (verification step 1) is run
+by the orchestrator outside the sandbox if the sandbox cannot run it; record
+it as blocked-in-sandbox per rule 11 rather than as a blocker. Never write an
+npm cache into `emaki/dist` or any other tracked path.
 
 **`tsconfig.json`.** Copy `editor/tsconfig.json`'s compilerOptions exactly,
 with these differences:
@@ -732,3 +742,29 @@ pre-mutation content) and confirm the boundary test passes.
 ### Session: 2026-10-31 (plan authored, workflow session 586 step 4)
 **Tasks Completed**: none.
 **Notes**: Ready for wave 1.
+
+### Session: 2026-11-01 (partial implementation)
+**Tasks Completed**: None fully. Implemented the sparse heightmap in
+`emaki/src/layout/heightmap.ts`; pre-write state was absent, post-write SHA-256
+`3539e29717ed8ec701d43f8ddd8aedeff5940062e4591b65af03319134fbe87c`.
+**Verification**: `node --test tmp/emaki/EMK-CORE/heightmap-smoke.mjs`
+passed 2 tests (log `tmp/emaki/EMK-CORE/heightmap-smoke-final.log`). This
+is supplemental evidence, not a substitute for the required package gates.
+**Remaining**: T1-T3 and T5, heightmap integration and required T4 tests,
+package verification, mutation evidence, and per-file hashes. Formal review,
+commit and integration remain downstream workflow steps.
+
+### Session: 2026-11-01 (continuation; blocked)
+**Progress**: Added the package scaffold, contracts, draft core/input/view,
+layout and rendering files, five copied test files and initial focused tests.
+The copied test counts are recorded in `tmp/emaki/EMK-CORE/test-disposition.json`.
+The renderer pass separation and integration remain incomplete; none of the
+T1-T5 completion criteria is asserted complete. Per-file intent evidence and
+source hashes are under `tmp/emaki/EMK-CORE/`.
+**Blocker**: An offline `npm install --prefer-offline --offline --no-audit
+--no-fund` using a copy of the existing cache failed with `ENOTCACHED` for the
+`@codemirror/commands` registry response. See
+`tmp/emaki/EMK-CORE/npm-install.log`. T1 requires stopping on a cache miss.
+Supply the missing cached registry response and package dependencies, or amend
+the plan to permit fetching, before resuming installation, implementation,
+and all required package checks. No package installation completed.

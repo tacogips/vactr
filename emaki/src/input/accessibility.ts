@@ -1,0 +1,126 @@
+import type { EditorCore } from '../core/editor-core';
+
+export const INPUT_WINDOW_LIMIT = 8192;
+const graphemes = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
+export function boundary(text: string, pos: number, bias: -1 | 1 = -1): number {
+  pos = Math.max(0, Math.min(text.length, pos));
+  // Segment only the containing line; CRLF is one navigation unit.
+  if (text[pos - 1] === '\r' && text[pos] === '\n') return pos + (bias < 0 ? -1 : 1);
+  let start = pos;
+  while (start > 0 && text[start - 1] !== '\n' && text[start - 1] !== '\r') start--;
+  let end = pos;
+  while (end < text.length && text[end] !== '\n' && text[end] !== '\r') end++;
+  for (const s of graphemes.segment(text.slice(start, end))) {
+    const a = start + s.index, b = a + s.segment.length;
+    if (a < pos && pos < b) return bias < 0 ? a : b;
+    if (a >= pos) break;
+  }
+  return pos;
+}
+export interface InputWindow { start: number; end: number; value: string; anchor: number; head: number; outside: boolean }
+export function surroundingWindow(surface: EditorCore): InputWindow {
+  const doc = surface.state.doc, selection = surface.state.selection.main;
+  const from = Math.max(0, selection.head - INPUT_WINDOW_LIMIT - 4);
+  const to = Math.min(doc.length, selection.head + INPUT_WINDOW_LIMIT + 4);
+  const local = doc.sliceString(from, to);
+  const snap = (position: number, bias: -1 | 1): number => from + boundary(local, position - from, bias);
+  let start = snap(Math.max(0, selection.head - INPUT_WINDOW_LIMIT / 2), 1);
+  let end = snap(Math.min(doc.length, start + INPUT_WINDOW_LIMIT), -1);
+  if (end === doc.length) start = snap(Math.max(0, end - INPUT_WINDOW_LIMIT), 1);
+  // A single oversized grapheme cannot fit: retain an empty caret window.
+  if (end < start || selection.head < start || selection.head > end) start = end = snap(selection.head, -1);
+  return { start, end, value: doc.sliceString(start, end), anchor: selection.anchor, head: selection.head,
+    outside: selection.from < start || selection.to > end };
+}
+
+/** Accessible DOM bridge only; the canvas owns all visible source and feedback. */
+export class AccessibilityBridge {
+  readonly textarea: HTMLTextAreaElement;
+  readonly status: HTMLElement;
+  window: InputWindow;
+  private projected = { start: 0, end: 0, direction: 'none' as string };
+  private dirty = false;
+  private positionDirty = true;
+  constructor(private surface: EditorCore, container: HTMLElement, label = 'Code editor') {
+    this.textarea = document.createElement('textarea');
+    this.textarea.setAttribute('aria-label', label);
+    this.textarea.setAttribute('aria-multiline', 'true');
+    this.textarea.setAttribute('autocapitalize', 'off'); this.textarea.spellcheck = false;
+    this.textarea.wrap = 'off'; this.textarea.autocomplete = 'off';
+    Object.assign(this.textarea.style, { position: 'fixed', opacity: '0', color: 'transparent',
+      background: 'transparent', caretColor: 'transparent', width: '1px', height: '20px',
+      padding: '0', border: '0', resize: 'none', overflow: 'hidden' });
+    this.status = document.createElement('div'); this.status.setAttribute('role', 'status');
+    this.status.setAttribute('aria-live', 'polite');
+    Object.assign(this.status.style, { position: 'absolute', width: '1px', height: '1px', overflow: 'hidden', clipPath: 'inset(50%)' });
+    container.append(this.textarea, this.status);
+    this.window = { start: -1, end: -1, value: '', anchor: 0, head: 0, outside: false };
+    this.markDirty(); this.flush({ position: true });
+  }
+  markDirty(): void { this.dirty = true; }
+  markPositionDirty(): void { this.positionDirty = true; }
+  get isDirty(): boolean { return this.dirty; }
+  get isPositionDirty(): boolean { return this.positionDirty; }
+  flush(opts: { position?: boolean } = {}): void {
+    if (this.dirty) {
+      const previous = this.window;
+      const next = surroundingWindow(this.surface);
+      const actual = this.textarea.value;
+      if (next.value !== actual || next.start !== previous.start || next.end !== previous.end) {
+        if (next.start === previous.start) {
+          let prefix = 0;
+          while (prefix < actual.length && prefix < next.value.length && actual[prefix] === next.value[prefix]) prefix++;
+          let suffix = 0;
+          while (suffix < actual.length - prefix && suffix < next.value.length - prefix &&
+            actual[actual.length - 1 - suffix] === next.value[next.value.length - 1 - suffix]) suffix++;
+          this.textarea.setRangeText(next.value.slice(prefix, next.value.length - suffix), prefix, actual.length - suffix, 'preserve');
+        } else {
+          this.textarea.value = next.value;
+        }
+      }
+      this.window = next;
+      this.dirty = false;
+    }
+    const { start, end, anchor, head } = this.window;
+    const a = Math.max(start, Math.min(end, anchor)) - start, h = Math.max(start, Math.min(end, head)) - start;
+    const from = Math.min(a, h), to = Math.max(a, h), direction = anchor > head ? 'backward' : 'forward';
+    if (this.textarea.selectionStart !== from || this.textarea.selectionEnd !== to || this.textarea.selectionDirection !== direction) {
+      this.textarea.setSelectionRange(from, to, direction);
+    }
+    this.projected = { start: this.textarea.selectionStart, end: this.textarea.selectionEnd, direction: this.textarea.selectionDirection };
+    if (opts.position) { this.position(); this.positionDirty = false; }
+  }
+  refresh(): void {
+    this.markDirty(); this.flush({ position: true });
+  }
+  position(): void {
+    const rect = this.surface.coordsAtPos(this.surface.state.selection.main.head);
+    if (!rect) return;
+    const view = window.visualViewport;
+    // Geometry is viewport CSS coordinates. Clamp into the visible keyboard viewport.
+    const left = view?.offsetLeft ?? 0, top = view?.offsetTop ?? 0;
+    this.textarea.style.left = `${Math.max(left, Math.min(left + (view?.width ?? window.innerWidth) - 1, rect.left))}px`;
+    this.textarea.style.top = `${Math.max(top, Math.min(top + (view?.height ?? window.innerHeight) - (rect.bottom - rect.top), rect.top))}px`;
+    this.textarea.style.height = `${Math.max(1, rect.bottom - rect.top)}px`;
+  }
+  readSelection(): { anchor: number; head: number } | null {
+    const el = this.textarea;
+    if (el.selectionStart === this.projected.start && el.selectionEnd === this.projected.end && el.selectionDirection === this.projected.direction) return null;
+    const backward = el.selectionDirection === 'backward';
+    const doc = this.surface.state.doc;
+    const anchor = this.window.start + (backward ? el.selectionEnd : el.selectionStart);
+    const head = this.window.start + (backward ? el.selectionStart : el.selectionEnd);
+    const from = Math.max(0, Math.min(anchor, head) - 4), to = Math.min(doc.length, Math.max(anchor, head) + 4);
+    const local = doc.sliceString(from, to);
+    return { anchor: from + boundary(local, anchor - from, backward ? 1 : -1),
+      head: from + boundary(local, head - from, backward ? -1 : 1) };
+  }
+  announce(message: string, visible = false): void {
+    this.status.textContent = message.slice(0, 256);
+    Object.assign(this.status.style, visible
+      ? { position: 'absolute', width: 'auto', height: 'auto', clipPath: 'none' }
+      : { position: 'absolute', width: '1px', height: '1px', clipPath: 'inset(50%)' });
+  }
+  focus(): void { this.textarea.focus({ preventScroll: true }); }
+  dispose(): void { this.textarea.remove(); this.status.remove(); }
+}

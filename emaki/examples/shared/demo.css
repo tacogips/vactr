@@ -1,0 +1,19 @@
+ :root {
+  --emaki-bg: #0c0f15;
+  --emaki-panel: #18202c;
+  --emaki-text: #e6ebf2;
+  --emaki-muted: #a0aebf;
+  --emaki-accent: #71b4ff;
+  --emaki-diff-add: #173f2b;
+  --emaki-diff-del: #4d2026;
+  --emaki-diff-add-strong: #286c43;
+  --emaki-diff-del-strong: #80323b;
+  --emaki-space-2: 8px;
+  --emaki-space-3: 12px;
+}
+* { border-radius: 0; }
+button, input, select { appearance: none; }
+body { background: var(--emaki-bg); color: var(--emaki-text); font-family: sans-serif; }
+main { padding: var(--emaki-space-3); }
+nav { display: flex; gap: var(--emaki-space-2); }
+a { color: var(--emaki-accent); }

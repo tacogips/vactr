@@ -1,12 +1,13 @@
 {
   "taskId": "emaki",
   "workflowMode": "issue-resolution",
-  "workflowExecutionId": "opus-terra-design-and-implement-review-loop-session-586",
-  "issueReference": "workflowInput issue 'Extract vactr's canvas editor into the standalone emaki library (staged at emaki/) with plugins, range/line formats, virtualized JSON rendering and a realtime diff sample; vactr consumes it' (no GitHub issue number; intake comm-011210; design comm-011211, revision comm-011213, accepted comm-011214). Target repo for the operator's later copy: https://github.com/tacogips/emaki @0d49bb0",
+  "workflowExecutionId": "opus-terra-design-and-implement-review-loop-session-596",
+  "previousWorkflowExecutionIds": ["opus-terra-design-and-implement-review-loop-session-586"],
+  "issueReference": "workflowInput issue 'Extract vactr's canvas editor into the standalone emaki library (staged at emaki/) with plugins, range/line formats, virtualized JSON rendering and a realtime diff sample; vactr consumes it' (no GitHub issue number; intake comm-011210; design comm-011211, revision comm-011213, accepted comm-011214; rerun session-596 plans accepted comm-011369). Target repo for the operator's later copy: https://github.com/tacogips/emaki @0d49bb0",
   "implementationBranch": "wf/emaki",
   "baseBranch": "wf/emaki",
   "remote": "origin",
-  "originalHead": "a6e5bea3d97d2f86310aed7a34b27b8998a62d9a",
+  "originalHead": "ca265ccffbbbfcf54e82cc1e04535a4976d11214",
   "designDocPaths": [
     "design-docs/specs/design-emaki.md",
     "design-docs/user-qa/pending-emaki-questions.md",
@@ -18,7 +19,7 @@
   "commonRules": "impl-plans/active/emaki-00-rules.md",
   "evidenceRoot": "tmp/emaki",
   "reviewContext": {
-    "issueReference": "workflowInput issue 'Extract vactr's canvas editor into the standalone emaki library (staged at emaki/) with plugins, range/line formats, virtualized JSON rendering and a realtime diff sample; vactr consumes it' (no GitHub issue number); workflow opus-terra-design-and-implement-review-loop-session-586; intake comm-011210; design comm-011211, revision comm-011213, accepted comm-011214; plan revision comm-011217 (repairs EMK-R5-01 high, EMK-R5-02 mid); plans accepted comm-011218 (step5-impl-plan-review attempt 1); checkpoint at HEAD a6e5bea on wf/emaki. Later copy target: https://github.com/tacogips/emaki @0d49bb0",
+    "issueReference": "workflowInput issue 'Extract vactr's canvas editor into the standalone emaki library (staged at emaki/) with plugins, range/line formats, virtualized JSON rendering and a realtime diff sample; vactr consumes it' (no GitHub issue number); workflow opus-terra-design-and-implement-review-loop-session-586; intake comm-011210; design comm-011211, revision comm-011213, accepted comm-011214; plan revision comm-011217 (repairs EMK-R5-01 high, EMK-R5-02 mid); plans accepted comm-011218 (step5-impl-plan-review attempt 1); first checkpoint bd9ff06. Session 586 wave 1 blocked because EMK-CORE mutationEvidence created emaki/src/zz-mutation.ts outside writePaths; amendment ca265cc moves the boundary negative controls into owned files (emaki/src/types.ts for EMK-CORE, editor/src/code/mount.ts for EMK-VAC-SWITCH) with byte-identical restore. Rerun session-596 re-reviewed the plans and accepted them (comm-011369); no plan is committed yet (emaki/ absent), so all 13 plans remain; this checkpoint is at HEAD ca265cc on wf/emaki. Later copy target: https://github.com/tacogips/emaki @0d49bb0",
     "userProblem": "vactr's canvas editor engine (editor/src/code, ~12k lines) is tied to vactr types and has no plugin, widget, range/line-format or variable-height mechanism. The user wants it extracted into a standalone library emaki that vactr loads, with line-embedded plugins (video, animation), character and line formats (beat glow via marks), inline sequencer and oscilloscope plugins in vactr, a realtime GitHub-style side-by-side diff demo, and fast virtualized rendering of a 10k-line JSON file.",
     "requiredOutcomes": [
       "emaki/ is a standalone package: cd emaki && npm ci --prefer-offline && npm run check && npm test && npm run build pass, and the boundary test proves no import escapes emaki/.",
@@ -44,7 +45,7 @@
       "Heavy runs (editor full vitest, emaki/editor builds, Playwright, mise run build-wasm-release) take the measurement lock /Users/taco/gits/tacogips/vactr-worktrees/.measure-lock (rule 7). Rebuild wasm and editor dist before any vactr e2e (rule 8).",
       "Scoped per-plan gates for wave siblings (rule 12b): scoped vitest is the pass gate; npm run check errors outside the plan's writePaths/sharedPaths are recorded as sibling drift; full vitest and build are informational and recorded in the plan log, not listed as plan verification. Plans alone in their wave and the single editor writer per wave keep full-suite gates.",
       "Serial wave-join gate after each wave (rule 12a, see waveJoinGates), run by the orchestrator under the lock; the next wave starts only when the join is green; failures route to the plan owning the failing path.",
-      "Verification records use {command, exitStatus: 0, testsRun, testsPassed, failureCount: 0, outcome: \"passed\", log, notes}; negative controls only in mutationEvidence (rule 10). The Codex sandbox cannot run Playwright; such runs are recorded blocked-in-sandbox and run by the orchestrator (rule 11).",
+      "Verification records use {command, exitStatus: 0, testsRun, testsPassed, failureCount: 0, outcome: \"passed\", log, notes}; negative controls only in mutationEvidence (rule 10), and a negative control never creates a file outside the plan's writePaths; it mutates an owned file and restores it byte-identically (amendment ca265cc). The Codex sandbox cannot run Playwright; such runs are recorded blocked-in-sandbox and run by the orchestrator (rule 11).",
       "No audible audio (Chromium --mute-audio); never change the Mac system volume (rule 17).",
       "UI: flat, border-radius 0, token palette, controls spaced at least 8 px, no native widget look (rule 16).",
       "Touched or new source files stay under 1000 lines."

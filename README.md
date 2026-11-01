@@ -99,19 +99,19 @@ Back end (TASK-007..008):
   labelled source-stage against the pinned reference by
   `mise run compare-plaits-voice`; it is not a full source port
   (design PLV-001, `examples/voice-layer.vact`).
-- `music-things/crates/`: the synth and effect DSP kernels live in three
-  reusable crates with no external dependencies and no vactr types, each
-  building natively and for `wasm32-unknown-unknown`.
-  `music-things-dsp` holds shared primitives, FFT and sample views.
-  `music-things-synth` holds oscillator, drum, voice and Mutable
-  Instruments-derived kernels. `music-things-fx` holds effect groups,
-  granular and effect-kind dispatch. The crate order is dsp, then synth,
-  then fx. The root `Cargo.toml` is a workspace
-  (`members = [".", "music-things/crates/*"]`) that depends on the crates
-  by path. `src/dsp` keeps the engine, catalogs, codec and the ported
-  coverage manifest. Its old module paths re-export the crates or wrap
-  them in thin adapters, so audio output is bit-identical. Provenance for
-  the moved code is in `music-things/THIRD_PARTY_NOTICES.md` (design
+- [music-things](https://github.com/tacogips/music-things): the synth and
+  effect DSP kernels live in three reusable crates in that repository, with
+  no external dependencies and no vactr types, each building natively and
+  for `wasm32-unknown-unknown`. `music-things-dsp` holds shared primitives,
+  FFT and sample views. `music-things-synth` holds oscillator, drum, voice
+  and Mutable Instruments-derived kernels. `music-things-fx` holds effect
+  groups, granular and effect-kind dispatch. vactr depends on them as git
+  dependencies pinned by revision in `Cargo.toml` (vactr's tests enable
+  their `test-support` feature through `[dev-dependencies]`). `src/dsp`
+  keeps the engine, catalogs, codec and the ported coverage manifest. Its
+  old module paths re-export the crates or wrap them in thin adapters, so
+  audio output is bit-identical. Provenance for the moved code is in the
+  music-things `THIRD_PARTY_NOTICES.md` (design
   `design-docs/specs/design-music-things-extraction.md`).
 - Bass voices ([design](design-docs/specs/design-bass-voices.md)):
   `analog-bass` (modeled ladder), `acid-bass` (diode ladder), `fm-bass`
@@ -500,14 +500,11 @@ CARGO_TERM_QUIET=true cargo build
 CARGO_TERM_QUIET=true cargo build --features lsp
 CARGO_TERM_QUIET=true cargo build --target wasm32-unknown-unknown
 CARGO_TERM_QUIET=true cargo build --target wasm32-unknown-unknown --no-default-features --features host-wasm
-for c in music-things/crates/*; do
-  CARGO_TERM_QUIET=true cargo build --manifest-path "$c/Cargo.toml" --target wasm32-unknown-unknown
-done
-CARGO_TERM_QUIET=true cargo clippy --workspace --all-targets -- -D warnings
+CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings
 CARGO_TERM_QUIET=true cargo clippy --all-targets --features lsp -- -D warnings
 CARGO_TERM_QUIET=true cargo fmt --check
 NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 \
-  CARGO_TERM_QUIET=true cargo nextest run --workspace
+  CARGO_TERM_QUIET=true cargo nextest run
 CARGO_TERM_QUIET=true cargo test
 CARGO_TERM_QUIET=true cargo test --features lsp --test lsp_smoke
 ```

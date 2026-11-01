@@ -709,10 +709,12 @@ dependencies = [
 [[package]]
 name = "music-things-dsp"
 version = "0.1.0"
+source = "git+https://github.com/tacogips/music-things?rev=529e4f8e5b926933b319b7fa7adc2a87d59f6b6d#529e4f8e5b926933b319b7fa7adc2a87d59f6b6d"
 
 [[package]]
 name = "music-things-fx"
 version = "0.1.0"
+source = "git+https://github.com/tacogips/music-things?rev=529e4f8e5b926933b319b7fa7adc2a87d59f6b6d#529e4f8e5b926933b319b7fa7adc2a87d59f6b6d"
 dependencies = [
  "music-things-dsp",
  "music-things-synth",
@@ -721,6 +723,7 @@ dependencies = [
 [[package]]
 name = "music-things-synth"
 version = "0.1.0"
+source = "git+https://github.com/tacogips/music-things?rev=529e4f8e5b926933b319b7fa7adc2a87d59f6b6d#529e4f8e5b926933b319b7fa7adc2a87d59f6b6d"
 dependencies = [
  "music-things-dsp",
 ]

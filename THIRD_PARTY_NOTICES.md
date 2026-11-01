@@ -1,6 +1,6 @@
 # Third-party notices
 
-Since 2026-10-31 the DSP sources covered below live in the in-tree crates under `music-things/crates/`; their staged notices are in `music-things/THIRD_PARTY_NOTICES.md`.
+Since 2026-11-01 the DSP sources covered below live in the crates of https://github.com/tacogips/music-things (paths below as `music-things/crates/...` refer to that repository); its `THIRD_PARTY_NOTICES.md` carries the same notices.
 
 ## Optional local source-comparison probe
 

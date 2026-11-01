@@ -683,3 +683,14 @@ Each defaults to its recommendation:
 - `design-musicdsp-effects.md`, `design-musicdsp-synths.md`,
   `design-mutable-audio.md`, `design-implementation.md` 12.5 and 12.8.8
 - `.agents/skills/rust-coding-standards/SKILL.md`
+
+
+## Post-run move (2026-11-01)
+
+The staged `music-things/crates/*` were imported unchanged (apart from doc
+comments that cited vactr design sections) into
+https://github.com/tacogips/music-things at 529e4f8e5b926933b319b7fa7adc2a87d59f6b6d. vactr now depends on
+`music-things-dsp`, `music-things-synth` and `music-things-fx` as git
+dependencies pinned to that revision, enables `test-support` only from
+`[dev-dependencies]`, and no longer declares a Cargo workspace or carries
+the in-tree `music-things/` directory.

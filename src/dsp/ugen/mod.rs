@@ -17,85 +17,84 @@
 mod build_helpers;
 use build_helpers::{mem_need, topo_order};
 
-pub mod additive;
+pub use music_things_synth::additive;
 pub mod analog_pair;
-pub mod analog_percussion;
-pub mod bass_voice;
-pub mod braids_cloud;
-pub mod braids_digital;
-pub mod braids_filter;
-pub mod braids_five;
-pub mod braids_fm;
-pub mod braids_formant;
-pub mod braids_noise;
-pub mod braids_percussion;
-pub mod braids_physical;
-pub mod braids_struck;
-pub mod braids_subsync;
-pub mod braids_triple;
-pub mod braids_wave_bank;
-pub mod braids_wave_line;
+pub use music_things_synth::analog_percussion;
+pub use music_things_synth::bass_voice;
+pub use music_things_synth::braids_cloud;
+pub use music_things_synth::braids_digital;
+pub use music_things_synth::braids_filter;
+pub use music_things_synth::braids_five;
+pub use music_things_synth::braids_fm;
+pub use music_things_synth::braids_formant;
+pub use music_things_synth::braids_noise;
+pub use music_things_synth::braids_percussion;
+pub use music_things_synth::braids_physical;
+pub use music_things_synth::braids_struck;
+pub use music_things_synth::braids_subsync;
+pub use music_things_synth::braids_triple;
+pub use music_things_synth::braids_wave_bank;
+pub use music_things_synth::braids_wave_line;
 pub mod catalog;
-pub mod chip_pair;
+pub use music_things_synth::chip_pair;
 pub mod chord_pair;
-pub mod clock_noise_pair;
+pub use music_things_synth::clock_noise_pair;
 pub mod digital_drum;
 pub mod dual_kick;
-pub mod elements_internal;
-pub mod env;
-pub mod feedback_metal;
-pub mod filter;
-pub mod fm;
-pub mod fm_drum;
+pub use music_things_synth::elements_internal;
+pub use music_things_synth::env;
+pub use music_things_synth::feedback_metal;
+pub use music_things_synth::filter;
+pub use music_things_synth::fm;
+pub use music_things_synth::fm_drum;
 pub mod fm_pair;
-pub mod frame_keyframe;
-pub mod frame_lfo;
-pub mod fusion_drum;
-pub mod gendyn;
-pub mod grain_pair;
+pub use music_things_synth::frame_keyframe;
+pub use music_things_synth::frame_lfo;
+pub use music_things_synth::fusion_drum;
+pub use music_things_synth::gendyn;
+pub use music_things_synth::grain_pair;
 pub mod hat_pair;
-pub mod hurdy_gurdy;
-pub mod kalimba;
+pub use music_things_synth::hurdy_gurdy;
+pub use music_things_synth::kalimba;
 pub mod mixer;
-pub mod modal_pair;
-pub mod musicdsp_synth;
-pub mod number_station;
-pub mod osc;
-pub mod particle_pair;
-pub mod peak_function;
-pub mod peak_pulse;
-pub mod phase_pair;
-pub mod rings_part;
+pub use music_things_synth::modal_pair;
+pub use music_things_synth::musicdsp_synth;
+pub use music_things_synth::number_station;
+pub use music_things_synth::osc;
+pub use music_things_synth::particle_pair;
+pub use music_things_synth::peak_function;
+pub use music_things_synth::peak_pulse;
+pub use music_things_synth::phase_pair;
+pub use music_things_synth::rings_part;
 pub mod sample;
-pub mod scanned;
+pub use music_things_synth::scanned;
 pub mod shape_pair;
-pub mod six_op_original;
+pub use music_things_synth::six_op_original;
 pub mod snare_pair;
-pub mod spectrum_pair;
-pub mod speech_original;
+pub use music_things_synth::spectrum_pair;
+pub use music_things_synth::speech_original;
 pub mod stage_chain;
-pub mod stage_linked;
-pub mod stage_segment;
-pub mod string_choir;
+pub use music_things_synth::stage_linked;
+pub use music_things_synth::stage_segment;
+pub use music_things_synth::string_choir;
 pub mod string_machine_pair;
-pub mod string_pair;
-pub mod swarm_pair;
+pub use music_things_synth::string_pair;
+pub use music_things_synth::swarm_pair;
 pub mod table_terrain_pair;
 pub mod terrain_pair;
-pub mod tidal_function;
-pub mod tidal_poly;
-pub mod tonewheel;
+pub use music_things_synth::tidal_function;
+pub use music_things_synth::tidal_poly;
+pub use music_things_synth::tonewheel;
 pub mod va_filter;
 pub mod vactrol_gate;
 pub mod voice_layer;
-pub mod vosim;
+pub use music_things_synth::vosim;
 pub mod wavetable;
 
 use crate::dsp::arena::SampleStore;
 use crate::dsp::caps::CapabilitySet;
 use crate::dsp::cells::CellId;
 use crate::dsp::controls;
-use crate::dsp::effects::prim::{Biquad, DelayLine};
 use crate::dsp::effects::{self, FxStats, MAX_FX_PARAMS};
 use crate::dsp::graph::{
     BankRef, EffectKind, GranSrc, InstDef, InstId, NodeAudioShape, TableRef, UGenSpec, DISCARD,
@@ -373,53 +372,7 @@ impl NodeSpec {
     };
 }
 
-/// Per-node scalar state inside a voice.
-#[derive(Clone, Copy, Default, PartialEq, Debug)]
-pub struct NodeState {
-    pub s: [f32; 8],
-    pub bq: [Biquad; 2],
-    pub dl: DelayLine,
-    pub u: [u32; 4],
-}
-
-impl NodeState {
-    /// Marks the node finished (an envelope or a one-shot player).
-    pub fn finish(&mut self) {
-        self.u[3] = 1;
-    }
-
-    /// True once `finish` ran.
-    #[must_use]
-    pub fn done(&self) -> bool {
-        self.u[3] == 1
-    }
-}
-
-/// One kernel input: an audio-rate buffer or a block-constant value.
-#[derive(Clone, Copy, Debug)]
-pub enum Inp<'a> {
-    Buf(&'a [f32]),
-    Val(f32),
-}
-
-impl Inp<'_> {
-    /// The value at frame `i` (the last frame past the end).
-    #[inline]
-    #[must_use]
-    pub fn at(&self, i: usize) -> f32 {
-        match self {
-            Inp::Val(v) => *v,
-            Inp::Buf(b) => b.get(i).or_else(|| b.last()).copied().unwrap_or(0.0),
-        }
-    }
-
-    /// The block's first value (control-rate reads).
-    #[inline]
-    #[must_use]
-    pub fn first(&self) -> f32 {
-        self.at(0)
-    }
-}
+pub use music_things_synth::{Inp, NodeState};
 
 /// What a kernel may read besides its inputs.
 pub struct Kx<'a> {
@@ -433,6 +386,16 @@ pub struct Kx<'a> {
     pub stats: &'a mut FxStats,
     /// The voice's seed for noise and grain randomness.
     pub seed: u32,
+}
+
+impl music_things_synth::KernelContext for Kx<'_> {
+    fn kernel_ctx(&self) -> music_things_synth::KernelCtx {
+        music_things_synth::KernelCtx {
+            sr: self.sr,
+            gate: self.gate,
+            seed: self.seed,
+        }
+    }
 }
 
 /// Why a graph cannot be compiled (reported as `graph-too-large` or an

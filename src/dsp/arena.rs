@@ -58,20 +58,11 @@ pub enum StoreKind {
     Arena { bytes: usize },
 }
 
-/// One installed sample as the audio side reads it.
-#[derive(Clone, Copy, Debug)]
-pub struct SampleView<'a> {
-    /// Interleaved frames.
-    pub data: &'a [f32],
-    pub channels: u8,
-    pub rate: u32,
-}
+pub use music_things_dsp::SampleView;
 
-impl SampleView<'_> {
-    /// The number of frames.
-    #[must_use]
-    pub fn frames(&self) -> usize {
-        self.data.len() / usize::from(self.channels.max(1))
+impl music_things_dsp::SampleSource for SampleStore {
+    fn sample(&self, id: u32) -> Option<SampleView<'_>> {
+        self.get(id)
     }
 }
 

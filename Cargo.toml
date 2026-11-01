@@ -20,6 +20,11 @@ lsp = ["host-native", "dep:tower-lsp", "dep:tokio"]
 
 # Core dependencies (design 14.5.2): wasm32-clean.
 [dependencies]
+# Synth and effect DSP kernels (https://github.com/tacogips/music-things),
+# pinned by revision so audio output stays reproducible.
+music-things-dsp = { git = "https://github.com/tacogips/music-things", rev = "529e4f8e5b926933b319b7fa7adc2a87d59f6b6d" }
+music-things-synth = { git = "https://github.com/tacogips/music-things", rev = "529e4f8e5b926933b319b7fa7adc2a87d59f6b6d" }
+music-things-fx = { git = "https://github.com/tacogips/music-things", rev = "529e4f8e5b926933b319b7fa7adc2a87d59f6b6d" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 miniz_oxide = "0.9"
@@ -35,6 +40,10 @@ tower-lsp = { version = "0.20", optional = true }
 tokio = { version = "1", optional = true, features = ["rt", "io-std", "macros", "sync"] }
 
 [dev-dependencies]
+# Test-only helpers of the staged crates, used by unchanged vactr tests.
+music-things-dsp = { git = "https://github.com/tacogips/music-things", rev = "529e4f8e5b926933b319b7fa7adc2a87d59f6b6d", features = ["test-support"] }
+music-things-synth = { git = "https://github.com/tacogips/music-things", rev = "529e4f8e5b926933b319b7fa7adc2a87d59f6b6d", features = ["test-support"] }
+music-things-fx = { git = "https://github.com/tacogips/music-things", rev = "529e4f8e5b926933b319b7fa7adc2a87d59f6b6d", features = ["test-support"] }
 
 [profile.release]
 lto = true

@@ -1,5 +1,18 @@
 # Implementation Plans
 
+## music-things DSP extraction (2026-10-31)
+
+These plans implement [design-music-things-extraction.md](../design-docs/specs/design-music-things-extraction.md) on branch `wf/music-things-extract` (designed in session 577). They move vactr's synth and effect kernels into the in-tree crates `music-things/crates/music-things-{dsp,synth,fx}`, keeping audio bit-identical. All nine plans are Completed and archived (2026-11-01, workflow session 605) after test-integrity and adversarial review accepted them. MTX-00 was recorded as an accepted dependency in session 601. The combined-tree gates passed on the same tree (`tmp/music-things/MTX-91/` and `tmp/music-things/reconcile-605-wave5/`): workspace nextest 3113/3113 (3 skipped), baseline test names unmatched=0, workspace clippy `-D warnings`, host-wasm and per-crate wasm32 builds, editor vitest 2399 passed (1 protocol-filtered), the standalone virtual-workspace build and test (74 crate tests), the banned-token grep and the protected-path diff against `a6e5bea`. Common rules stay in [music-things-protocol.md](active/music-things-protocol.md). The [dispatch manifest](active/music-things-dispatch.json) stays in `active/` until the branch commit because the running workflow references it; its `planPath` fields still record the pre-archive `active/` locations.
+
+- **Wave 0**: [MTX-00 foundation](completed/music-things-00-foundation.md)
+- **Wave 1** (parallel): [MTX-S1 classic, FM and MI roles](completed/music-things-s1-classic-mi.md), [MTX-F1 dynamics to lo-fi groups](completed/music-things-f1-dynamics-time.md)
+- **Wave 2** (parallel): [MTX-S2 pairs and LPG](completed/music-things-s2-pairs-lpg.md), [MTX-F2 texture, granular, stream and analyzer](completed/music-things-f2-texture-granular.md)
+- **Wave 3** (parallel): [MTX-S3 Braids and voice cores](completed/music-things-s3-braids-voices.md), [MTX-F3 cross-mod and banks](completed/music-things-f3-crossmod-banks.md)
+- **Wave 4**: [MTX-90 fx dispatch](completed/music-things-90-fx-dispatch.md)
+- **Wave 5**: [MTX-91 notices and final drop-in gates](completed/music-things-91-notices-final.md)
+
+Operator follow-up (out of scope for this run): copy `music-things/crates/*` and merge `music-things/THIRD_PARTY_NOTICES.md` into https://github.com/tacogips/music-things, then switch vactr to a pinned git dependency.
+
 ## emaki editor library (2026-10-31)
 
 These plans implement [design-emaki.md](../design-docs/specs/design-emaki.md) on branch `wf/emaki` (workflow session 586). The work extracts the canvas editor engine into the standalone `emaki` package at `emaki/` and adds:
@@ -9,9 +22,9 @@ These plans implement [design-emaki.md](../design-docs/specs/design-emaki.md) on
 - a diff module and three demos;
 - a Playwright perf script and gates.
 
-vactr then consumes emaki through `file:../emaki` and gains beat-glow marks, an inline sequencer, an inline oscilloscope and a persisted toggle.
+vactr then consumes emaki (first through `file:../emaki`, now through the pinned `github:tacogips/emaki#<sha>` dependency) and gains beat-glow marks, an inline sequencer, an inline oscilloscope and a persisted toggle.
 
-Status: Completed (closeout in workflow session 626). The design status is Implemented, and the verification record is section 19 of design-emaki.md. Results: vactr vitest 2370/2370, emaki vitest 139/139 (2509 = baseline 2401 + 108 new tests), examples e2e 8/8, emaki perf allPass in Chromium and WebKit, and canvas measure run emaki-001 passing in both browsers. vactr test:style and behavior e2e (39/54) still exit 1, with only the recorded rule-13 pre-existing baseline failures; they are not clean passes. Remaining operator work: physical iPad/WKWebView checks, and the copy into tacogips/emaki with the switch to `github:tacogips/emaki#<sha>`. Common execution rules are in [emaki-00-rules.md](completed/emaki-00-rules.md), and the manifest is [emaki-dispatch.json](active/emaki-dispatch.json).
+Status: Completed (closeout in workflow session 626). The design status is Implemented, and the verification record is section 19 of design-emaki.md. Results: vactr vitest 2370/2370, emaki vitest 139/139 (2509 = baseline 2401 + 108 new tests), examples e2e 8/8, emaki perf allPass in Chromium and WebKit, and canvas measure run emaki-001 passing in both browsers. vactr test:style and behavior e2e (39/54) still exit 1, with only the recorded rule-13 pre-existing baseline failures; they are not clean passes. The copy into tacogips/emaki and the switch to `github:tacogips/emaki#<sha>` are done. Remaining operator work: physical iPad/WKWebView checks. Common execution rules are in [emaki-00-rules.md](completed/emaki-00-rules.md), and the manifest is [emaki-dispatch.json](active/emaki-dispatch.json).
 
 - **Wave 1**: [EMK-CORE scaffold, contract types and engine extraction](completed/emaki-10-core.md)
 - **Wave 2** (parallel): [EMK-DECOR marks, glow and line formats](completed/emaki-20-decor.md), [EMK-WIDGETS widgets and vertical motion](completed/emaki-21-widgets.md), [EMK-LANG incremental highlighter, JSON and fixture](completed/emaki-22-lang.md), [EMK-DIFF diff module](completed/emaki-23-diff.md)

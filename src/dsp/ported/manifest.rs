@@ -64,43 +64,7 @@ impl ResourceFlags {
     };
 }
 
-/// Whether an upstream engine already applies its own envelope.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Enveloped {
-    Never,
-    Always,
-    WhenClocked,
-}
-
-/// Per-position voice-level registration copied from upstream `Voice::Init`.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct VoiceRegistration {
-    pub enveloped: Enveloped,
-    pub out_gain: f32,
-    pub aux_gain: f32,
-}
-
-impl VoiceRegistration {
-    /// Returns the registered gain for lane zero (main) or lane one (aux).
-    #[must_use]
-    pub fn gain(&self, lane: u8) -> f32 {
-        if lane == 0 {
-            self.out_gain
-        } else {
-            self.aux_gain
-        }
-    }
-
-    /// Resolves the registration rule against the engine's clocked state.
-    #[must_use]
-    pub fn is_enveloped(&self, clocked: bool) -> bool {
-        match self.enveloped {
-            Enveloped::Never => false,
-            Enveloped::Always => true,
-            Enveloped::WhenClocked => clocked,
-        }
-    }
-}
+pub use music_things_synth::lpg::{Enveloped, VoiceRegistration};
 
 static VOICE_REGISTRATIONS: [VoiceRegistration; 24] = [
     VoiceRegistration {

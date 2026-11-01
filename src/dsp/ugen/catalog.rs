@@ -20,7 +20,7 @@ use super::{BuildError, Node, RawGraph};
 /// The most input ports a node has: `MAX_PARAMS` (design-music 4.1,
 /// DDRUM-002A), so the digital drum family's full control surface fits one
 /// core node's port array.
-pub const MAX_PORTS: usize = 48;
+pub use music_things_synth::MAX_PORTS;
 
 /// One input port: its name and constant default.
 #[derive(Clone, Copy, PartialEq, Debug)]

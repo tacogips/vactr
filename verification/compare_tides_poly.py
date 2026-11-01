@@ -441,7 +441,7 @@ def main():
                 "AMPLITUDE/PHASE/FREQUENCY AD/AR": "divide by 8 (source Fold: 0..8 V to 0..1)",
                 "AMPLITUDE/PHASE/FREQUENCY LOOPING": "divide by 5 (source Fold: -5..5 V to -1..1)",
                 "source": "tides2/poly_slope_generator.h lines 295-303, 319, 325-345, 369-393",
-                "vactr": "src/dsp/ugen/tidal_poly.rs lines 111-143 clamps normalized outputs to -1..1",
+                "vactr": "music-things/crates/music-things-synth/src/tidal_poly.rs line 146 clamps normalized outputs to -1..1",
             },
             "tides1": "no additional scale: the C++ probe divides uint16 unipolar by 65535 and int16 bipolar by 32767; Vactr tidal_function emits normalized lanes",
         },

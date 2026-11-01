@@ -235,22 +235,3 @@ description = "Check all tracked Vact sources are formatted"
 run = "git ls-files -z '*.vact' | xargs -0 cargo run --quiet -- fmt --check"
 env = { CARGO_TERM_QUIET = "true" }
 
-[tasks.emaki-check]
-description = "Check emaki types"
-run = "cd emaki && npm run check"
-
-[tasks.emaki-test]
-description = "Test emaki"
-run = "cd emaki && npm test"
-
-[tasks.emaki-build]
-description = "Build emaki demos"
-run = "cd emaki && npm run build"
-
-[tasks.emaki-perf]
-description = "Measure emaki performance"
-run = "cd emaki && npm run perf"
-
-[tasks.emaki-e2e]
-description = "Run emaki browser tests"
-run = "cd emaki && npm run e2e"

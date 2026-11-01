@@ -1088,3 +1088,16 @@ G5: `emaki/node_modules` was absent for the first editor clean install and prese
 G6: vactr 2370 + emaki 139 = 2509, equal to the measured 2401 baseline + 108 new tests and above 2384 + 108. All five moved files retain their counts (42 total); details: `tmp/emaki/EMK-CLOSEOUT/test-count.json`. Boundary tests passed 2/2 each; the operator reports no vactr imports in emaki and maximum touched source length 843 lines. Wave joins are recorded under `tmp/emaki/wave-2-join/`, `tmp/emaki/wave-3-join/`, `tmp/emaki/wave-4-join/`, and `tmp/emaki/wave-5-join/`.
 
 Physical iPad/WKWebView validation remains an operator activity; WebKit Playwright is the automated proxy. EQ1–EQ6 defaults were applied. Section 8.4's PageUp/PageDown snapping sentence describes browser scrolling: `KeyboardController` does not handle those keys, either before or after this work.
+
+## 20. Repository handoff (2026-11-01)
+
+The staged `emaki/` package was copied into https://github.com/tacogips/emaki
+(commit `0cf0f26`, standalone `npm ci`, check, 139 tests and build pass) and
+removed from vactr. `editor/package.json` pins
+`github:tacogips/emaki#0cf0f26e7f2cb3c4c48e38e6f6163a6b23642d38`; the
+`../emaki` Vite/Vitest `fs.allow` entries and the `emaki-*` mise tasks were
+dropped (they live in the emaki repository). Verified on the pinned
+dependency: `npm ci`, `npm run check`, vitest 170 files / 2370 tests,
+`VACTR_REQUIRE_SESSION_ABI=1 npm run build`, `npm run e2e:examples` 8/8
+(logs `tmp/emaki/git-dep/`). For local emaki development, point the
+dependency at `file:../../emaki` temporarily.

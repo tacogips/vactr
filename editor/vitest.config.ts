@@ -12,7 +12,7 @@ const perf = env.VACTR_PERF === '1';
 export default defineConfig({
   plugins: [solid()],
   resolve: { conditions: ['development', 'browser'], dedupe: ['@codemirror/state', '@codemirror/commands'] },
-  server: { fs: { allow: ['.', '../examples', '../emaki'] } },
+  server: { fs: { allow: ['.', '../examples'] } },
   test: {
     server: { deps: { inline: ['emaki'] } },
     environment: 'jsdom',

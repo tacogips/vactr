@@ -167,7 +167,7 @@ export default defineConfig({
   worker: { format: 'es' },
   plugins: [solid(), vactrAssets()],
   resolve: { dedupe: ['@codemirror/state', '@codemirror/commands'] },
-  server: { fs: { allow: ['.', '../examples', '../emaki'] } },
+  server: { fs: { allow: ['.', '../examples'] } },
   build: {
     target: 'es2022',
   },

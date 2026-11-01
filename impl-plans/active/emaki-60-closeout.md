@@ -230,3 +230,24 @@ and section 19 built from the operator summary, including the G9 tables and
 the version() API addition), mise tasks, the impl-plans index and README
 updates, then complete.
 
+## Operator note 2 (after session 623): remaining C1 evidence supplied
+
+- G9 canonical evidence: `npm run e2e -- --browser all --profile measure
+  --write-evidence --run-id emaki-001` under the quiet-host procedure with a
+  fresh release wasm, exit 0, no harness failures in either browser
+  (Chromium input p95 15.8, text 6.7, animation 0.4, frame 17.5, sync p99
+  49.5; WebKit 18 / 8 / 1 / 19, sync p99 45.7; ledger after dispose 0).
+  Evidence directory `design-docs/specs/evidence/canvas-cutover/emaki-001/`
+  (and the harness row in `design-canvas-editor-evidence.md`), log
+  `tmp/emaki/EMK-CLOSEOUT/operator/G9-emaki-001.log`. The earlier non-evidence
+  measure runs in the summary document the regression and its fix.
+- G5 present case: editor clean install, check and single-instance test all
+  exit 0 (`G5-present-*` logs, `G5-present-install-state.txt`).
+- G6 reconciliation: `tmp/emaki/EMK-CLOSEOUT/test-count.json`, pass
+  (vactr 2370 + emaki 139 = 2509 = measured baseline 2401 + 108 new tests;
+  the plan's 2384 predates later origin/main commits and is also satisfied).
+- All of this is merged into `tmp/emaki/EMK-CLOSEOUT/operator/summary.json`
+  (`G9canonical`, `G5presentEditor`, `testCount`).
+
+C1 is complete with passing evidence. Do C2 now.
+

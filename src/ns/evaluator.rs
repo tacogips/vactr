@@ -701,6 +701,11 @@ impl Evaluator {
         self.graph.owner_of_bind(key)
     }
 
+    /// Retires a file's removed live sink without unbinding session names.
+    pub(crate) fn retire_live_binding(&mut self, key: SlotKey, file: FileId) {
+        self.graph.retire_bind(key, file);
+    }
+
     /// The state of the form that owns `name`.
     #[must_use]
     pub fn form_state(&self, name: &str) -> Option<FormState> {

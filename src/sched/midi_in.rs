@@ -444,6 +444,7 @@ impl Runtime {
         let ctls: Vec<(KwId, Value)> = e.controls.iter().map(|(k, v)| (*k, v.clone())).collect();
         self.telemetry.publish(
             PlayingEvent {
+                rest: false,
                 slot: l.name,
                 beat,
                 time: now,

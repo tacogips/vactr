@@ -320,6 +320,7 @@ impl Session {
         // 6. The forms in span: eval, drain, publish.
         let mut results = Vec::new();
         let mut batches = Vec::new();
+        let mut evaluated = BTreeSet::new();
         for form in &forms {
             if !in_span(form, span) {
                 continue;
@@ -331,6 +332,9 @@ impl Session {
                 continue;
             }
             let out = self.ev.eval_form_in(form, &self.manifest);
+            if let Some(owner) = self.ev.graph().form_of_gen(out.form_gen) {
+                evaluated.insert(owner);
+            }
             self.note_revision(out.form_gen, fid, rev);
             let report = self.ev.last_pass().cloned();
             let drained = self.rt.drain(&mut self.ev);
@@ -353,6 +357,16 @@ impl Session {
                 failure,
                 form_gen: out.form_gen,
             });
+        }
+        // Absence is meaningful only for a completely successful whole-file
+        // submission. Partial evaluation and broken edits remain incremental.
+        if fid != FileId::CONSOLE
+            && span.is_none()
+            && faults.is_empty()
+            && results.iter().all(|form| form.failure.is_none())
+            && !diags.iter().any(|diag| diag.severity == Severity::Error)
+        {
+            self.reconcile_live_bindings(fid, &evaluated);
         }
         // A pass may have rebuilt forms of other documents too.
         self.refresh_all_auth();

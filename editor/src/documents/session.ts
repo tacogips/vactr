@@ -1,5 +1,4 @@
 import { Text, Transaction } from '@codemirror/state';
-import { isolateHistory } from '@codemirror/commands';
 import type { CodeSurface } from '../app/apis';
 import type { DocSource } from './types';
 
@@ -30,7 +29,7 @@ export class DocumentSession {
     this.surface.dispatch({
       changes: { from: 0, to: doc.length, insert: text },
       selection: { anchor: 0 },
-      annotations: [isolateHistory.of('full'), Transaction.userEvent.of('input.replace.document')],
+      annotations: [Transaction.addToHistory.of(false), Transaction.userEvent.of('input.replace.document')],
       scrollIntoView: true,
     });
     this.currentSource = source;

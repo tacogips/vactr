@@ -206,7 +206,9 @@ export class TransportBar {
           audioReason: audio.reason,
           evalStatus,
           onAudio: () => void audio.start(),
-          ...(opts.onRun ? { onRun: () => opts.onRun?.() } : {}),
+          ...(opts.onRun ? { onRun: () => {
+            if (this.playback() !== 'stopped') opts.onRun?.();
+          } } : {}),
           ...(opts.vim ? { vim: opts.vim } : {}),
           ...(opts.inline ? { inline: opts.inline } : {}),
           ...(opts.unapplied ? { unapplied: opts.unapplied } : {}),
@@ -347,7 +349,7 @@ export class TransportBar {
     this.anchor.observe(events.map((e) => e.time));
     for (const ev of events) {
       const row = this.row(ev.slot);
-      if (this.stopHeld) continue;
+      if (this.stopHeld || ev.rest) continue;
       row.times.push(this.anchor.local(ev.time));
       if (row.times.length > MAX_SLOT_TIMES) row.times.splice(0, row.times.length - MAX_SLOT_TIMES);
     }

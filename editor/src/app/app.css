@@ -679,3 +679,6 @@
 .vact-unapplied-setting { margin-top: var(--vt-space-3); }
 .vact-unapplied-setting input[type="color"] { width: 40px; height: 28px; padding: 2px; border: 1px solid var(--vt-border); background: var(--vt-raised); border-radius: 0; cursor: pointer; }
 .vact-unapplied-setting input:focus-visible { outline: var(--vt-focus-w) solid var(--vt-accent); outline-offset: var(--vt-focus-offset); }
+@media (pointer: coarse) {
+  .vact-unapplied-setting input[type="color"] { min-height: 36px; }
+}

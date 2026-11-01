@@ -384,6 +384,8 @@ export interface DiagBody {
 }
 
 export interface WirePlaying {
+  /** Silent step with source timing for playback highlighting. */
+  rest?: boolean;
   id?: number;
   epoch?: string;
   end_time?: number;

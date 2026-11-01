@@ -152,8 +152,9 @@ export class ParamsArea {
       client.on('playing', (env) => {
         if (env.kind !== 'playing') return;
         const bpc = store.tempo?.beats_per_cycle ?? 4;
-        this.grid.update(env.body.events, bpc);
-        this.roll.update(env.body.events, bpc);
+        const hits = env.body.events.filter(event => !event.rest);
+        this.grid.update(hits, bpc);
+        this.roll.update(hits, bpc);
       }),
     );
 

@@ -343,6 +343,7 @@ pub fn playing_wire(
     rev_of: &dyn Fn(&SrcRef) -> u64,
 ) -> WirePlaying {
     WirePlaying {
+        rest: e.rest,
         epoch: None,
         end_time: Some(e.time + e.dur),
         id: e.id,

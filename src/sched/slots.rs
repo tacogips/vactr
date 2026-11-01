@@ -14,6 +14,7 @@ use std::rc::Rc;
 use crate::ns::stage::SlotKey;
 use crate::pattern::build::pattern_of;
 use crate::pattern::pat::Pat;
+use crate::reader::span::FileId;
 use crate::sched::staging::Lane;
 use crate::tex::texnode::{OutId, TexNode};
 use crate::value::intern::{intern_kw, name_of_kw, KwId};
@@ -89,6 +90,8 @@ pub struct Slot {
     pub pending: Option<(Binding, Ratio64)>,
     /// The newest generation (bumped on rebind, stop, hush, tempo).
     pub gen: u32,
+    /// Source file of the last accepted binding, never a failed attempt.
+    pub(crate) binding_file: Option<FileId>,
     pub orbit: u8,
     pub muted: bool,
     /// A `once` slot: removed when its only lane ends.
@@ -110,6 +113,7 @@ impl Slot {
             bound: None,
             pending: None,
             gen: 0,
+            binding_file: None,
             orbit: 0,
             muted: false,
             ephemeral: false,

@@ -60,6 +60,16 @@ function event(text: string, literal: string, time: number, dur: [number, number
 }
 
 describe('HighlightScheduler (criterion 1, mock clock)', () => {
+  it('highlights a nil rest only during its scheduled interval', () => {
+    const text = 's [:bd nil :sd]';
+    const { sched, clock } = setup(text);
+    sched.onPlaying([{ ...event(text, 'nil', 1, [1, 1]), rest: true }]);
+    expect(sched.tick()).toEqual([]);
+    clock.advance(1);
+    expect(sched.tick()).toEqual([{ from: 7, to: 10 }]);
+    clock.advance(0.5);
+    expect(sched.tick()).toEqual([]);
+  });
   it('counts a playing range that becomes unmappable after acceptance', () => {
     const text = 'd1 "bd"';
     const clock = new MockClock(0.1);

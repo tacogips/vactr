@@ -320,6 +320,7 @@ impl Runtime {
             let was_used = slot.gen > 0;
             slot.gen += 1;
             slot.bound = None;
+            slot.binding_file = None;
             slot.pending = None;
             slot.lanes.clear();
             let (id, gen, kind, out) = (slot.id, slot.gen, slot.kind, slot.out_id());

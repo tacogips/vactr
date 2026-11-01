@@ -96,7 +96,8 @@ async function inspectPage(page, engine, viewportName, probe) {
       const value = luminance(fill);
       if (value.alpha !== 0 && (!Number.isFinite(value.value) || value.value > 0.5)) add('native-fill', element.tagName.toLowerCase(), { fill, luminance: value.value });
     }
-    const activeOverlays = [...document.querySelectorAll('.vact-vim-keymap, .vact-vim-hints')].filter(isVisible);
+    const overlaySelector = '.vact-vim-keymap, .vact-vim-hints, .vact-header-popover';
+    const activeOverlays = [...document.querySelectorAll(overlaySelector)].filter(isVisible);
     const controls = [...document.querySelectorAll('button, select, input')].filter((element) => isVisible(element) && !activeOverlays.some((overlay) => {
       if (overlay.contains(element)) return false;
       const controlRect = element.getBoundingClientRect();
@@ -107,7 +108,7 @@ async function inspectPage(page, engine, viewportName, probe) {
       if (element instanceof HTMLInputElement && element.type === 'checkbox') return element.closest('label') ?? element;
       return element;
     }).filter((element, index, all) => all.indexOf(element) === index).map((element) => ({ element, inProbe: fixture.contains(element) }));
-    const overlayGroup = (element) => element.closest('.vact-vim-keymap, .vact-vim-hints');
+    const overlayGroup = (element) => element.closest(overlaySelector);
     const paintedForGap = (element) => {
       for (let node = element; node instanceof Element; node = node.parentElement) {
         const style = getComputedStyle(node);

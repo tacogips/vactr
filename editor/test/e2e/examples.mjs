@@ -83,7 +83,9 @@ async function main() {
     await check('run-plays-moderately', async () => {
       await page.locator('.vact-audio').click();
       await page.waitForFunction(() => document.querySelector('.vact-audio-state')?.getAttribute('data-state') === 'running', undefined, { timeout: 10000 });
-      await page.locator('.vact-run').click();
+      // Update cannot start stopped playback; Play evaluates and starts the document.
+      if (!(await page.locator('.vact-run').isDisabled())) throw new Error('Update is enabled while playback is stopped');
+      await page.locator('.vact-play-toggle').click();
       const diagnosticState = () => page.evaluate(() => ({
         sink: window.__vactrSink?.report(),
         audio: document.querySelector('.vact-audio-state')?.getAttribute('data-state'),
@@ -132,11 +134,14 @@ async function main() {
       await waitForDocument(page, industrial);
       const input = page.locator('.vact-code-input-bridge textarea');
       await input.focus();
+      // Opening a document starts a fresh file history: undo must not cross back into the showcase.
       await input.press('ControlOrMeta+z');
-      await waitForDocument(page, showcase);
+      await sleep(300);
+      if (await document(page) !== industrial) throw new Error('undo crossed the file-load boundary');
       await input.press('ControlOrMeta+Shift+z');
-      await waitForDocument(page, industrial);
-      return { opened: 'industrial-techno', undoRestoredShowcase: true, redoRestoredExample: true };
+      await sleep(300);
+      if (await document(page) !== industrial) throw new Error('redo crossed the file-load boundary');
+      return { opened: 'industrial-techno', undoStayedInFile: true, redoStayedInFile: true };
     });
 
     let markerText = '';
@@ -221,15 +226,13 @@ async function main() {
       await page.waitForFunction(() => Boolean(window.__vactrPerf), undefined, { timeout: 30000 });
       await waitForDocument(page, technoPattern);
       const status = await page.locator('.vact-doc-picker-status').textContent();
-      if (!status?.includes('restores your unsaved draft')) throw new Error(`draft recovery status missing: ${status}`);
+      if (!status?.includes('Opened techno-pattern')) throw new Error(`open status missing: ${status}`);
+      // An explicit URL example starts fresh history; the older draft is not reachable through undo.
       await page.locator('.vact-code-input-bridge textarea').focus();
       await page.keyboard.press('ControlOrMeta+z');
-      await waitForDocument(page, markerText);
-      await sleep(1500);
-      await page.goto(`${server.origin}/?perf=1`, { waitUntil: 'domcontentloaded' });
-      await page.waitForFunction(() => Boolean(window.__vactrPerf), undefined, { timeout: 30000 });
-      await waitForDocument(page, markerText);
-      return { urlExample: 'techno-pattern', undoRestoredDraft: true, autosaveRewroteDraft: true };
+      await sleep(300);
+      if (await document(page) !== technoPattern) throw new Error('undo restored the replaced draft across the file boundary');
+      return { urlExample: 'techno-pattern', undoStayedInFile: true };
     });
 
     await context.close();

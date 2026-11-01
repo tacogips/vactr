@@ -318,6 +318,7 @@ impl Runtime {
                         },
                     );
                     announcer.ahead.push(PlayingEvent {
+                        rest: matches!(rec.payload.value, crate::value::value::Value::Nil),
                         slot: slot.name(),
                         beat,
                         time: onset,

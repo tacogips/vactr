@@ -6,6 +6,8 @@ import { Client } from '../../src/protocol/client';
 import { Store } from '../../src/protocol/store';
 import { RecordingTransport } from '../support/recording';
 import { DocumentSession } from '../../src/documents/session';
+import { VimController } from '../../src/code/vim/controller';
+import { createTestHost } from '../code/vim/host';
 
 function surfaceWith(text = ''): CodeSurface {
   const client = new Client(new RecordingTransport(), { store: new Store() });
@@ -16,18 +18,44 @@ describe('DocumentSession', () => {
   beforeEach(() => vi.useFakeTimers());
   afterEach(() => vi.useRealTimers());
 
-  it('makes replacement one undo and redo step immediately after typing', () => {
+  it('resets undo and redo on file replacement and preserves new-file editing history', () => {
     const surface = surfaceWith();
     const session = new DocumentSession(surface);
     surface.dispatch({ changes: { from: 0, insert: 'abc' }, userEvent: 'input.type' });
     session.replace('X', { kind: 'example', id: 'acid-techno' });
     expect(surface.state.doc.toString()).toBe('X');
-    expect(surface.undo()).toBe(true);
-    expect(surface.state.doc.toString()).toBe('abc');
-    expect(surface.redo()).toBe(true);
+    expect(surface.undo()).toBe(false);
+    expect(surface.redo()).toBe(false);
     expect(surface.state.doc.toString()).toBe('X');
     expect(session.dirty()).toBe(false);
+    surface.dispatch({ changes: { from: 1, insert: '!' }, userEvent: 'input.type' });
+    expect(surface.undo()).toBe(true);
+    expect(surface.state.doc.toString()).toBe('X');
+    expect(surface.redo()).toBe(true);
+    expect(surface.state.doc.toString()).toBe('X!');
     surface.dispose(); session.dispose();
+  });
+
+  it.each(['different', 'old'])('prevents Vim redo across a file load containing %s text', loaded => {
+    const surface = surfaceWith('old');
+    const session = new DocumentSession(surface);
+    const host = { ...createTestHost(''), state: () => surface.state,
+      dispatch: surface.dispatch.bind(surface), subscribe: surface.subscribe.bind(surface),
+      undo: () => surface.undo(), redo: () => surface.redo() };
+    const vim = new VimController(host);
+    const key = (value: string) => vim.handleKey({ key: value === '<C-r>' ? 'r' : value,
+      ctrlKey: value === '<C-r>', metaKey: false, altKey: false, shiftKey: false });
+    key('x'); key('u');
+    expect(surface.state.doc.toString()).toBe('old');
+    expect(surface.retentionStatus.redoDepth).toBeGreaterThan(0);
+    session.replace(loaded, { kind: 'file', name: 'new.vact' });
+    key('<C-r>'); key('u');
+    expect(surface.state.doc.toString()).toBe(loaded);
+    key('x'); key('u');
+    expect(surface.state.doc.toString()).toBe(loaded);
+    key('<C-r>');
+    expect(surface.state.doc.toString()).toBe(loaded.slice(1));
+    vim.dispose(); session.dispose(); surface.dispose();
   });
 
   it('tracks clean and restored startup baselines without adding initial history', () => {

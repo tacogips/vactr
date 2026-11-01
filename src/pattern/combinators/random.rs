@@ -96,9 +96,15 @@ fn query_filtered(
     st: &mut QState<'_, '_>,
 ) -> Vec<Event> {
     let before = st.cx.vm.take_output();
+    let rest_mark = st.rests.events.len();
     let events = query_child(inner, span, 0, st);
+    let rests = st.rests.events.split_off(rest_mark);
     let produced = !events.is_empty();
     let kept = filter(events, x, keep_below, p, st);
+    if !rests.is_empty() {
+        let rests = st.rest_predicate_work(|st| filter(rests, x, keep_below, p, st));
+        st.rests.events.extend(rests);
+    }
     let inner_out = st.cx.vm.take_output();
     let mut out = before;
     if !(produced && kept.is_empty()) {

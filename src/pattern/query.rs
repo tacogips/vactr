@@ -202,6 +202,14 @@ pub fn query(p: &Pat, span: TimeSpan, cx: &mut QueryCtx<'_>) -> QueryResult {
     query_state(p, span, QState::new(cx))
 }
 
+/// Scheduler query including silent, provenance-bearing rest intervals.
+/// Rest markers are appended only after musical composition has finished.
+pub(crate) fn query_playback(p: &Pat, span: TimeSpan, cx: &mut QueryCtx<'_>) -> QueryResult {
+    let mut state = QState::new(cx);
+    state.rests.enabled = true;
+    query_state(p, span, state)
+}
+
 /// Queries with full producer tracing, retaining the same bounds, events and
 /// faults as `query`. Song realization supplies canonical whole-cycle spans;
 /// this entry does not change legacy dynamic sampling or clipping semantics.
@@ -224,6 +232,10 @@ fn query_state(p: &Pat, span: TimeSpan, mut st: QState<'_, '_>) -> QueryResult {
                 st.fault(f, span, Some(anchor));
             }
         }
+    }
+    for mut rest in st.rests.events.drain(..) {
+        crate::pattern::eval::rests::finish_occurrence(&mut rest);
+        events.push(rest);
     }
     let faults = st.faults;
     let output = st.cx.vm.take_output();

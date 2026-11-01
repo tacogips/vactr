@@ -2,6 +2,8 @@
 // CE-TELEMETRY: the real raw host-wasm ABI, not fabricated clock messages.
 import { describe, expect, it } from 'vitest';
 import { decodeServer } from '../../src/protocol/envelope';
+import { HighlightScheduler } from '../../src/code/highlight';
+import { MockClock } from '../support/clock';
 import type { PlayingBody, TempoBody, TransportSample, WirePlaying } from '../../src/protocol/types';
 import {
   ackSampleInstalls,
@@ -95,6 +97,54 @@ function onlySample(records: readonly WasmRecord[]): TransportSample {
 }
 
 describe('canvas transport telemetry (real host-wasm artifact)', () => {
+  it('removes commented-out playback on whole-document Update while preserving other files', async () => {
+    const rig = await start();
+    const first = 's :analog > note [60 64 67 72] > d1';
+    const second = 's :analog > note [36 36 36 36] > d2';
+    evaluate(rig, 'main.vact', `${first}\n${second}`, 1);
+    evaluate(rig, 'other.vact', 's :analog > note [48 48 48 48] > d3', 1);
+    const before: WirePlaying[] = [];
+    for (let ms = 0; ms <= 1200; ms += 20) before.push(...events(tick(rig, ms / 1000)));
+    expect(new Set(before.map(event => event.slot))).toEqual(new Set(['d1', 'd2', 'd3']));
+    evaluate(rig, 'main.vact', `# ${first}\n${second}`, 2);
+    const after: WirePlaying[] = [];
+    for (let ms = 1220; ms <= 3500; ms += 20) {
+      const batch = events(tick(rig, ms / 1000));
+      if (ms >= 2200) after.push(...batch);
+    }
+    expect(new Set(after.map(event => event.slot))).toEqual(new Set(['d2', 'd3']));
+    evaluate(rig, 'main.vact', '', 3);
+    const remaining: WirePlaying[] = [];
+    for (let ms = 3520; ms <= 5500; ms += 20) remaining.push(...events(tick(rig, ms / 1000)));
+    expect(new Set(remaining.filter(event => event.time >= 4).map(event => event.slot))).toEqual(new Set(['d3']));
+    evaluate(rig, 'other.vact', '# stopped', 2);
+    let final: TransportSample | undefined;
+    for (let ms = 5520; ms <= 5800; ms += 20) final = samples(tick(rig, ms / 1000)).at(-1) ?? final;
+    expect(final?.active).toBe(false);
+  });
+
+  it('publishes nil source intervals that drive actual editor highlighting', async () => {
+    const rig = await start();
+    const source = 's [nil nil] > d1';
+    evaluate(rig, 'main.vact', source, 1);
+    const output: WirePlaying[] = [];
+    for (let ms = 0; ms <= 2100; ms += 20) output.push(...events(tick(rig, ms / 1000)));
+    const rests = output.filter(event => event.rest);
+    expect(rests.length).toBeGreaterThanOrEqual(2);
+    expect(output.every(event => event.rest)).toBe(true);
+    expect(new Set(rests.map(event => event.src?.span.start))).toEqual(new Set([3, 7]));
+    const clock = new MockClock();
+    const scheduler = new HighlightScheduler({ clock, file: 'main.vact', tempo: () => null,
+      map: span => ({ from: span.start, to: span.end }) });
+    const rest = rests[0]!;
+    expect(rest.src?.doc_revision).toBe(1);
+    expect(source.slice(rest.src!.span.start, rest.src!.span.end)).toBe('nil');
+    scheduler.onPlaying([rest]);
+    clock.advance(rest.time + 0.01);
+    expect(scheduler.tick()).toEqual([{ from: rest.src!.span.start, to: rest.src!.span.end }]);
+    clock.advance(rest.dur[0] / rest.dur[1] * 0.5);
+    expect(scheduler.tick()).toEqual([]);
+  });
   it('refreshes transport without tempo changes, paired with host time, at no more than 20 Hz', async () => {
     const rig = await start();
     evaluate(rig, 'main.vact', 'use-bpm 120', 17);

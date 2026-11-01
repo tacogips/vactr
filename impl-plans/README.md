@@ -33,6 +33,14 @@ Status: Completed (closeout in workflow session 626). The design status is Imple
 - **Wave 5**: [EMK-PERF perf script and budget gates](completed/emaki-50-perf.md)
 - **Wave 6**: [EMK-CLOSEOUT full gates, docs and tasks](completed/emaki-60-closeout.md)
 
+## Removed live bindings on Update (2026-10-24)
+
+Completed [whole-document removal reconciliation](completed/removed-live-bindings.md): commented/deleted parts stop naturally, other-file playback stays isolated, and obsolete reactive owners cannot resurrect. Verified with 457 affected Rust tests, 2422 frontend tests, strict native/WASM checks and Chromium/WebKit UI coverage against the rebuilt backend.
+
+## Live playback, edit feedback and Vim corrections (2026-10-24)
+
+Completed [silent nil playback highlights](completed/nil-playback-highlights.md) and [edit colors, stopped Update, file history boundaries, clipboard yank and indentation examples](completed/editor-playback-edit-feedback.md). Verification: 469 affected Rust tests, 2420 full frontend tests, 93 subsequent example checks, strict native/WASM checks, production build, 16 style combinations and Chromium/WebKit header e2e checks.
+
 ## Unapplied edit highlights (2026-10-23)
 
 Completed [pending ranges, evaluation acknowledgement, and persistent highlight color](completed/editor-unapplied-edits.md). TypeScript checking passed; tests were not requested.

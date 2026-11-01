@@ -19,6 +19,7 @@ mod merge;
 mod output;
 mod ramps;
 mod rebind;
+mod rests;
 mod timestamps;
 mod tuning;
 mod tuning_natives;

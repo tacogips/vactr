@@ -1,4 +1,5 @@
 import { isolateHistory, redoDepth, undoDepth } from '@codemirror/commands';
+import { isFileBoundary } from '../file-boundary';
 import { Transaction, type ChangeSpec, type EditorSelection, type EditorState, type TransactionSpec } from '@codemirror/state';
 import type { ExCommand } from './ex';
 import { parseEx } from './ex';
@@ -585,7 +586,11 @@ export class VimController implements VimInputHook {
 
   private writeRegister(name: string | null, value: import('./types').Register, kind: 'yank' | 'delete'): void {
     this.registers.write(name, value, kind);
-    if (name === '+' || name === '*') void this.host.clipboard.write(value.text).catch(() => this.message('clipboard unavailable; kept in the internal register', 'error'));
+    if (name === '_') return;
+    if (kind === 'yank' || name === '+' || name === '*') {
+      this.registers.setMirror(value.text, value.linewise);
+      void this.host.clipboard.write(value.text).catch(() => this.message('clipboard unavailable; kept in the internal register', 'error'));
+    }
   }
 
   private put(name: string, before: boolean, count: number): void {
@@ -782,6 +787,14 @@ export class VimController implements VimInputHook {
   }
 
   private onUpdate(update: import('./types').VimUpdate): void {
+    if (isFileBoundary(update.userEvent)) {
+      this.ledger.clear();
+      this.session.clear();
+      this.redo = new RedoRecorder();
+      this.visual = null;
+      this.parser.reset();
+      this.mode = 'normal';
+    }
     if (update.docChanged) {
       this.marks.map(update.changes);
       this.changes.record(update.changes, update.state.doc);

@@ -39,6 +39,28 @@ const tempo = (extra: Partial<TempoBody> = {}): TempoBody => ({ bpm: 120, beats_
 const play = (slot: string, time: number): WirePlaying => ({ slot, beat: [0, 1], time, dur: [1, 4] });
 
 describe('TransportBar', () => {
+  it('allows Update only after playback starts and disables it again after Stop', () => {
+    const onRun = vi.fn();
+    const { bar, parent } = setup({ onRun });
+    const update = parent.querySelector<HTMLButtonElement>('.vact-run')!;
+    expect(update.disabled).toBe(true);
+    update.click(); expect(onRun).not.toHaveBeenCalled();
+    parent.querySelector<HTMLButtonElement>('.vact-play-toggle')!.click();
+    expect(onRun).toHaveBeenCalledOnce();
+    bar.onPlaying([play('d1', 10)]); bar.tick();
+    expect(update.disabled).toBe(false);
+    update.click(); expect(onRun).toHaveBeenCalledTimes(2);
+    parent.querySelector<HTMLButtonElement>('.vact-play-toggle')!.click();
+    expect(update.disabled).toBe(true);
+    update.click(); expect(onRun).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps silent rest playback active without lighting a slot hit', () => {
+    const { bar, parent, text } = setup();
+    bar.onPlaying([{ ...play('d1', 10), rest: true }]); bar.tick();
+    expect(text('vact-playback-state')).toBe('Playing');
+    expect(parent.querySelector('[data-lit="on"]')).toBeNull();
+  });
   it('keeps a running empty-session clock hidden and ignores stale activity after Stop', () => {
     let sample: TransportSample = {
       epoch: 'e', sample_time: 10, cycle: [7, 1], bpm: 120, beats_per_cycle: 4,

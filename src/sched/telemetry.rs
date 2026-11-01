@@ -24,6 +24,8 @@ pub const WINDOW_SECONDS: f64 = 1.0;
 /// One realized event (design 11.6).
 #[derive(Clone, PartialEq, Debug)]
 pub struct PlayingEvent {
+    /// Silent source interval: highlight only, never a hit/control observation.
+    pub rest: bool,
     pub slot: KwId,
     pub beat: Ratio64,
     pub time: f64,
@@ -58,10 +60,12 @@ impl Telemetry {
                 num_f64(v).map(|x| (*k, x as f32))
             })
             .collect();
-        self.windows
-            .entry(ev.slot)
-            .or_default()
-            .push_back((ev.time, numeric));
+        if !ev.rest {
+            self.windows
+                .entry(ev.slot)
+                .or_default()
+                .push_back((ev.time, numeric));
+        }
         if self.queue.len() >= QUEUE_CAP {
             self.queue.pop_front();
             self.dropped += 1;

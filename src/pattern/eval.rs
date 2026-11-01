@@ -16,6 +16,7 @@ use crate::value::ratio::Ratio64;
 use crate::value::value::{Sound, Value};
 use crate::vm::fail::{FailCode, Failure, Origin};
 
+pub(crate) mod rests;
 pub(crate) mod song_clock;
 pub(crate) mod song_observation;
 pub(crate) mod song_provenance;
@@ -210,6 +211,7 @@ pub(crate) struct QState<'c, 'a> {
     song_replay: Option<std::rc::Rc<song_replay::ReplayView>>,
     issued_query: Option<song_provenance::SharedIssuedTranscript>,
     song_clock: song_clock::CanonicalClockProjection,
+    pub(crate) rests: rests::RestCapture,
 }
 
 impl<'c, 'a> QState<'c, 'a> {
@@ -230,6 +232,7 @@ impl<'c, 'a> QState<'c, 'a> {
             song_replay: None,
             issued_query: None,
             song_clock: song_clock::CanonicalClockProjection::Unknown,
+            rests: rests::RestCapture::default(),
         }
     }
 
@@ -422,6 +425,9 @@ impl<'c, 'a> QState<'c, 'a> {
     /// this call's error so the caller records it once.
     pub fn sample(&mut self, p: &Pat, t: Ratio64) -> Result<Vec<Event>, Failure> {
         let mark = self.faults.len();
+        if self.rests.enabled || self.rests.sample.is_some() {
+            return self.sample_playback(p, t);
+        }
         let events = if self.has_clock_observation() {
             self.with_clock_sampling(p, t, |st| st.reenter(|st| Ok(q(p, TimeSpan::point(t), st))))?
         } else {

@@ -104,7 +104,7 @@ describe('applyStartup', () => {
   beforeEach(() => vi.useFakeTimers());
   afterEach(() => vi.useRealTimers());
 
-  it('loads draft then URL example as one undoable step and autosaves draft after undo', () => {
+  it('loads a URL example with fresh history instead of restoring an old draft through undo', () => {
     const surface = makeSurface();
     const session = new DocumentSession(surface);
     const drafts = makeDrafts(draft);
@@ -113,14 +113,14 @@ describe('applyStartup', () => {
     const result = applyStartup(session, { text: 'A', source: { kind: 'example', id: 'acid-techno' }, restored: false, underlying: draft }, notice);
     expect(result).toBe(true);
     expect(surface.state.doc.toString()).toBe('A');
-    expect(surface.retentionStatus.undoDepth).toBe(1);
-    expect(notice).toHaveBeenCalledWith('Opened acid-techno; Undo (Mod-Z) restores your unsaved draft');
+    expect(surface.retentionStatus.undoDepth).toBe(0);
+    expect(notice).toHaveBeenCalledWith('Opened acid-techno');
     expect(drafts.cleared).toBe(1);
-    expect(surface.undo()).toBe(true);
-    expect(surface.state.doc.toString()).toBe('D');
-    expect(session.dirty()).toBe(true);
+    expect(surface.undo()).toBe(false);
+    expect(surface.state.doc.toString()).toBe('A');
+    expect(session.dirty()).toBe(false);
     vi.advanceTimersByTime(1000);
-    expect(drafts.writes).toEqual([{ text: 'D', source: session.source, savedAt: 99 }]);
+    expect(drafts.writes).toEqual([]);
     autosave.dispose(); session.dispose(); surface.dispose();
   });
 

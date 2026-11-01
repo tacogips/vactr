@@ -214,7 +214,7 @@ fn step_events(
     out: &mut Vec<Event>,
 ) -> Result<(), Failure> {
     match value {
-        Value::Nil => Ok(()),
+        Value::Nil => st.capture_rest(src, whole, piece),
         Value::List(l) if !atomic_lists => {
             let nested = steps_of_list(l);
             let Some(part) = sect(whole, piece) else {
@@ -250,7 +250,7 @@ fn step_events(
                         }
                         Ok(())
                     }
-                    Value::Nil => Ok(()),
+                    Value::Nil => st.capture_rest(src, whole, piece),
                     // A late name whose value is a list (`let bar [..]`, then
                     // `[bar bar]` or `cat [bar ..]`) is a nested step list, like
                     // the list literal itself; atomic positions keep it whole.
@@ -347,7 +347,7 @@ pub(crate) fn squeeze(
         begin: to_inner(part.begin)?,
         end: to_inner(part.end)?,
     };
-    let events = if st.has_clock_observation() {
+    let events = if st.captures_timing() {
         st.with_clock_frame(
             || {
                 crate::pattern::eval::song_clock::CanonicalClockFrame::squeeze(

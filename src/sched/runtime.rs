@@ -515,9 +515,20 @@ impl Runtime {
                 self.samples.request(&src, &mut self.hosts);
             }
         }
-        if let Err(mut f) = self.rebind(key, binding) {
-            f.origin.slot = Some(name);
-            rep.faults.push(f);
+        match self.rebind(key, binding) {
+            Ok(()) => {
+                let file = ev
+                    .form_of_bind(key)
+                    .and_then(|form| ev.graph().get(form))
+                    .map(|form| form.node.span.file);
+                if let Some(slot) = self.slots.get_mut(key) {
+                    slot.binding_file = file;
+                }
+            }
+            Err(mut f) => {
+                f.origin.slot = Some(name);
+                rep.faults.push(f);
+            }
         }
     }
 

@@ -335,6 +335,7 @@ fn servers() -> Vec<ServerMsg> {
         }),
         ServerMsg::Playing(PlayingBody {
             events: vec![WirePlaying {
+                rest: false,
                 epoch: None,
                 end_time: None,
                 id: Some(7),

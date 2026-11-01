@@ -9,6 +9,26 @@ const font: LayoutFont = { font: '16px test-mono', fallback: 'test-ja', lineHeig
 const view = { width: 320, height: 100, scrollLeft: 0, scrollTop: 0, left: 10, top: 20, gutter: 48 };
 
 describe('renderer layer placement', () => {
+  it('renders additions green, modifications yellow and deletions as red vertical lines', () => {
+    const layout = new TextLayout({ font: '', measureText: value => ({ width: width(value) }) }, font);
+    layout.setDocument('abc def ghi');
+    const gl = recordingGL(); const raster = rasterizer();
+    const renderer = new CanvasRenderer(document.createElement('canvas'), layout,
+      { gl: gl.gl, ledger: new ResourceLedger(), createCanvas: raster.createCanvas });
+    renderer.setViewport(view, 1);
+    try {
+      expect(renderer.render({ annotations: [
+        { kind: 'unapplied', editKind: 'addition', from: 0, to: 3 },
+        { kind: 'unapplied', editKind: 'modification', from: 4, to: 7 },
+        { kind: 'unapplied', editKind: 'deletion', from: 11, to: 11 },
+      ] })).toBe(true);
+      const changes = gl.draws.filter(draw => draw.layer === 'background' && draw.rect[3] === font.lineHeight);
+      const colors = changes.map(draw => draw.color.slice(0, 3).map(channel => Math.round(channel * 255)));
+      expect(colors).toEqual([[74, 222, 128], [250, 204, 21], [248, 113, 113]]);
+      expect(changes[2]!.rect[2]).toBe(3);
+      expect(changes[2]!.rect[3]).toBe(font.lineHeight);
+    } finally { renderer.dispose(); }
+  });
   it.each([1, 2])('keeps renderer layers and glyph quads aligned at DPR %i', dpr => {
     const text = '# c\nuse-bpm 108\ns :kalimba > note :c5';
     const doc = new TextLayout({ font: '', measureText: value => ({ width: width(value) }) }, font);

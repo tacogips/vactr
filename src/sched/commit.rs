@@ -826,16 +826,25 @@ impl Runtime {
                         caps: &self.caps,
                         diags: &mut diags,
                     };
-                    match commit(&ev, &mut cx, &ecx) {
+                    // Silent rest records participate in the same ledger and
+                    // announcements, but never reach a host or sound resolver.
+                    let rest = matches!(ev.value, Value::Nil);
+                    let committed = if rest {
+                        Ok(Committed::Dropped)
+                    } else {
+                        commit(&ev, &mut cx, &ecx)
+                    };
+                    match committed {
                         Ok(c) => {
                             rep.console.extend(lane.staging.mark_committed(&key));
-                            if matches!(c, Committed::Dropped) {
+                            if matches!(c, Committed::Dropped) && !rest {
                                 continue;
                             }
-                            if onset < now {
+                            if onset < now && !rest {
                                 late += 1;
                             }
                             let mut pe = PlayingEvent {
+                                rest,
                                 slot: name,
                                 beat: tempo.beats_at(whole.begin).unwrap_or(Ratio64::ZERO),
                                 time: onset,

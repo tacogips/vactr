@@ -9,6 +9,7 @@ mod codec;
 mod directives;
 mod editor_wire;
 mod eval;
+mod live_bindings;
 mod live_stop;
 mod momentary;
 mod packages;

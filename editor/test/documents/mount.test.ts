@@ -60,7 +60,7 @@ describe('documents area', () => {
     button.click();
   };
 
-  it('starts on the showcase without evaluating and opens another example as one undoable replacement', async () => {
+  it('starts on the showcase without evaluating and opens another example with fresh history', async () => {
     const env = setup();
     try {
       await env.area.ready;
@@ -76,13 +76,13 @@ describe('documents area', () => {
       expect(env.surface.state.doc.toString()).toBe('ACID');
       expect(env.root.querySelector('.vact-document-title')?.textContent).toBe('Acid');
       expect(env.root.querySelector('.vact-document-dirty')).toBeNull();
-      expect(env.surface.undo()).toBe(true);
-      expect(env.root.querySelector('.vact-document-dirty')?.getAttribute('aria-label')).toBe('Unsaved changes');
-      expect(env.surface.state.doc.toString()).toBe('SHOWCASE');
+      expect(env.surface.undo()).toBe(false);
+      expect(env.surface.redo()).toBe(false);
+      expect(env.surface.state.doc.toString()).toBe('ACID');
     } finally { env.dispose(); }
   });
 
-  it('confirms dirty replacement and keeps the previous buffer recoverable by undo', async () => {
+  it('confirms dirty replacement and clears previous-file history', async () => {
     const env = setup();
     try {
       await env.area.ready;
@@ -96,12 +96,12 @@ describe('documents area', () => {
       [...env.root.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent === 'Replace')?.click();
       await new Promise((resolve) => setTimeout(resolve, 0));
       expect(env.surface.state.doc.toString()).toBe('ACID');
-      expect(env.surface.undo()).toBe(true);
-      expect(env.surface.state.doc.toString()).toBe('EDITED');
+      expect(env.surface.undo()).toBe(false);
+      expect(env.surface.state.doc.toString()).toBe('ACID');
     } finally { env.dispose(); }
   });
 
-  it('opens a queued file after dirty confirmation as an undoable file source', async () => {
+  it('opens a queued file after dirty confirmation with fresh history', async () => {
     const env = setup();
     try {
       await env.area.ready;
@@ -120,8 +120,8 @@ describe('documents area', () => {
       clickButton(env.root, 'Use as default template');
       await new Promise((resolve) => setTimeout(resolve, 0));
       expect(env.storage.readTemplate()).toEqual({ kind: 'snapshot', name: 'x.vact', text: 'FILE' });
-      expect(env.surface.undo()).toBe(true);
-      expect(env.surface.state.doc.toString()).toBe('EDITED');
+      expect(env.surface.undo()).toBe(false);
+      expect(env.surface.state.doc.toString()).toBe('FILE');
     } finally { env.dispose(); }
   });
 

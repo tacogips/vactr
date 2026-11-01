@@ -58,9 +58,11 @@ pub(crate) fn subtree(
     st: &mut QState<'_, '_>,
     f: impl FnOnce(&mut QState<'_, '_>) -> Result<Vec<Event>, Failure>,
 ) -> Vec<Event> {
+    let rest_mark = st.rests.events.len();
     match f(st) {
         Ok(v) => v,
         Err(e) => {
+            st.rests.events.truncate(rest_mark);
             st.fault(e, p.span, Some(at));
             Vec::new()
         }

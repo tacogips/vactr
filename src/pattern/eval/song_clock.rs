@@ -10,6 +10,7 @@ use std::rc::Rc;
 mod dispatch;
 #[path = "song_clock_projection.rs"]
 mod projection;
+mod rests;
 pub(crate) use projection::{ProjectedInvocation, ProjectionBudget, SourceBoundaryRef};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -694,6 +695,9 @@ impl super::QState<'_, '_> {
         frame: impl FnOnce() -> Result<CanonicalClockFrame, Failure>,
         f: impl FnOnce(&mut Self) -> Result<T, Failure>,
     ) -> Result<T, Failure> {
+        if self.rests.enabled {
+            return self.with_rest_frame(frame, f);
+        }
         if self.observation.is_none() {
             return f(self);
         }
@@ -760,6 +764,9 @@ impl super::QState<'_, '_> {
         timing: Option<&Event>,
         f: impl FnOnce(&mut Self) -> Result<T, Failure>,
     ) -> Result<T, Failure> {
+        if self.rests.enabled {
+            return self.with_rest_sample(child, at, whole, part, f);
+        }
         if !self.has_clock_observation() {
             return f(self);
         }

@@ -208,7 +208,8 @@ export function TransportView(props: TransportViewProps): JSX.Element {
       </div>
       <div class="vact-transport-group vact-evaluate-group" role="group" aria-label="Live code">
         <Show when={props.onRun}>
-          <button type="button" class="vact-run" title="Update the whole document (Mod-Shift-Enter)"
+          <button type="button" class="vact-run" disabled={props.playback() === 'stopped'}
+            title={props.playback() === 'stopped' ? 'Play before updating the document' : 'Update the whole document (Mod-Shift-Enter)'}
             aria-label="Update document (Mod-Shift-Enter)" onClick={() => props.onRun?.()}>
             <Update /><span>Update</span>
           </button>
@@ -293,12 +294,12 @@ function EditorOptions(props: { vim?: TransportViewProps['vim']; inline?: Transp
       </div>}</Show>
       <Show when={props.unapplied}>{(setting) => <>
         <label class="vact-editor-option vact-unapplied-setting">
-          <span>Unapplied edit color</span>
-          <input type="color" aria-label="Unapplied edit color" value={setting().color()}
+          <span>Modified text color</span>
+          <input type="color" aria-label="Modified text color" value={setting().color()}
             onInput={(event) => setting().setColor(event.currentTarget.value)} />
         </label>
         <div class="vact-editor-option">
-          <span class="vact-shortcut-note">Clears after a successful update.</span>
+          <span class="vact-shortcut-note">Added: green. Modified: yellow by default. Deleted: red line. Clears after a successful update.</span>
           <button type="button" class="vact-unapplied-reset" onClick={() => setting().setColor(DEFAULT_UNAPPLIED_COLOR)}>Reset color</button>
         </div>
       </>}</Show>

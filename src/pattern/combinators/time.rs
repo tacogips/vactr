@@ -82,7 +82,7 @@ fn fast_by(
         return Ok(Vec::new());
     }
     let inner_span = span.map(|t| t.checked_mul(factor))?;
-    let events = if st.has_clock_observation() {
+    let events = if st.captures_timing() {
         st.with_clock_frame(
             || CanonicalClockFrame::fast(factor, inner_span, span),
             |st| Ok(query_child(inner, inner_span, 0, st)),
@@ -185,7 +185,7 @@ fn rev_piece(inner: &Pat, piece: TimeSpan, st: &mut QState<'_, '_>) -> Result<Ve
     } else {
         reflect_span(piece, mirror)?
     };
-    let events = if st.has_clock_observation() {
+    let events = if st.captures_timing() {
         observed_rev_child(inner, inner_span, piece, mirror, st)?
     } else {
         query_child(inner, inner_span, 0, st)
@@ -312,7 +312,7 @@ pub(crate) fn query_iter(
             }
             let shift = Ratio64::new(c.rem_euclid(n), n)?;
             let child = piece.map(|t| t.checked_add(shift))?;
-            let events = if st.has_clock_observation() {
+            let events = if st.captures_timing() {
                 st.with_clock_frame(
                     || CanonicalClockFrame::iter(shift, child, piece),
                     |st| Ok(query_child(inner, child, 0, st)),
@@ -350,15 +350,25 @@ pub(crate) fn query_chunk(
                 lo <= pos && pos < hi
             };
             let t = apply_transform(f, inner, st)?;
+            let rest_mark = st.rests.events.len();
             let mut events: Vec<Event> = transformed_child(&t, piece, 1, st)
                 .into_iter()
                 .filter(&inside)
                 .collect();
+            let transformed_rests = st.rests.events.split_off(rest_mark);
+            st.rests
+                .events
+                .extend(transformed_rests.into_iter().filter(&inside));
+            let rest_mark = st.rests.events.len();
             events.extend(
                 query_child(inner, piece, 0, st)
                     .into_iter()
                     .filter(|e| !inside(e)),
             );
+            let original_rests = st.rests.events.split_off(rest_mark);
+            st.rests
+                .events
+                .extend(original_rests.into_iter().filter(|e| !inside(e)));
             Ok(events)
         }));
     }

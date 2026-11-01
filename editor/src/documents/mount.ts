@@ -88,7 +88,7 @@ export function mount(root: HTMLElement, deps: EditorDeps, opts: DocumentsOption
   const replaceWith = (load: () => Promise<{ text: string; source: import('./types').DocSource }>) => {
     if (session.dirty()) {
       pendingLoad = load;
-      setPendingReplace('Replace the current document? Undo (Mod-Z) restores it.');
+      setPendingReplace('Replace the current document? This clears undo and redo history.');
       return;
     }
     void runReplacement(load);

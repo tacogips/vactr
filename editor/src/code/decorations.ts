@@ -2,7 +2,7 @@ import type { AnimatedMark, Mark, MarkStyle, RenderInput, ResolvedLineFormat } f
 import type { CodeAnnotation } from '../app/apis';
 import type { CursorShape } from './vim/types';
 import { DEFAULT_UNAPPLIED_COLOR, unappliedRgba } from './unapplied-settings';
-import type { VactrPalette } from './theme';
+import type { Rgba, VactrPalette } from './theme';
 
 export interface RenderFeedback {
   annotations?: readonly CodeAnnotation[]; cursor?: number | null;
@@ -15,6 +15,11 @@ export interface RenderFeedback {
 export const PLAYING_MARK: MarkStyle = { background: [0.7, 0.58, 0.26, 0.5], glow: { color: [0.7, 0.58, 0.26, 0.5], radius: 4 } };
 export const EVAL_MARK: MarkStyle = { background: [0.4, 0.64, 0.72, 0.5] };
 export const EVAL_ERROR_MARK: MarkStyle = { background: [0.8, 0.24, 0.32, 0.5] };
+/** Additions and deletions keep fixed colors; modifications follow the user's unapplied color. Deletions are zero-width bars. */
+function unappliedBackground(a: CodeAnnotation, color: string | undefined): Rgba {
+  const rgba = unappliedRgba(a.editKind === 'addition' ? '#4ade80' : a.editKind === 'deletion' ? '#f87171' : color ?? DEFAULT_UNAPPLIED_COLOR);
+  return a.editKind === 'deletion' ? [rgba[0], rgba[1], rgba[2], 0.9] : rgba;
+}
 export function toRenderInput(feedback: RenderFeedback, palette: VactrPalette): RenderInput {
   const tokens: NonNullable<RenderInput['tokens']>[number][] = [];
   const selection: NonNullable<RenderInput['selection']>[number][] = [];
@@ -27,7 +32,7 @@ export function toRenderInput(feedback: RenderFeedback, palette: VactrPalette): 
       case 'syntax': tokens.push({ ...range, tag: a.className ?? '' }); break;
       case 'selection': selection.push(range); break;
       case 'composition': composition.push(range); break;
-      case 'unapplied': marks.push({ ...range, style: { background: unappliedRgba(feedback.unappliedColor ?? DEFAULT_UNAPPLIED_COLOR), minWidth: 6 } }); break;
+      case 'unapplied': marks.push({ ...range, style: { background: unappliedBackground(a, feedback.unappliedColor), minWidth: 3 } }); break;
       case 'diagnostic': marks.push({ ...range, style: { underline: { color: palette.diagnostic, thickness: 2 } } }); break;
       case 'call-head': marks.push({ ...range, style: { underline: { color: palette.callHead, thickness: 1 } } }); break;
       case 'binding': if (a.label) marks.push({ ...range, style: { label: { text: a.label } } }); break;

@@ -1,7 +1,8 @@
-import type { Extension } from '@codemirror/state';
+import { Transaction, type Extension } from '@codemirror/state';
 import { EditorCore, touches } from 'emaki/engine';
 import type { CodeAnnotation, CodeSurface as SurfaceContract, MomentaryGesture, MomentaryProvider, MomentaryStart } from '../app/apis';
 import { DocumentSync } from './sync';
+import { isFileBoundary } from './file-boundary';
 
 export interface CodeSurfaceOptions {
   sync: DocumentSync;
@@ -23,6 +24,8 @@ export class CodeSurface extends EditorCore implements SurfaceContract {
     super({ doc, extensions: options.extensions, historyByteLimit: options.historyByteLimit, externalHistory: options.sync.history });
     this.sync = options.sync;
     this.onTransaction((tr) => this.sync.apply(tr));
+    // Source replacement starts a new file's edit history, discarding both branches.
+    this.onTransaction((tr) => { if (isFileBoundary(tr.annotation(Transaction.userEvent) ?? null)) this.resetHistory(); });
     this.onTransaction((tr) => {
       if (!tr.docChanged) return;
       for (const [owner, ranges] of this.annotations) this.annotations.set(owner, Object.freeze(ranges.flatMap((r) =>

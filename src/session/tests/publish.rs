@@ -527,6 +527,7 @@ fn scheduled_end_time_uses_original_seconds_and_preserves_source_revision() {
     use crate::value::intern::intern_kw;
     use crate::value::ratio::Ratio64;
     let event = PlayingEvent {
+        rest: false,
         slot: intern_kw("d1"),
         beat: Ratio64::ZERO,
         time: 2.0,
@@ -597,6 +598,7 @@ fn midi_restart_at_zero_invalidates_playing_inside_snapshot_cadence() {
 #[test]
 fn playing_wire_round_trip_and_legacy_json_omit_empty_additions() {
     let event = WirePlaying {
+        rest: false,
         epoch: Some("session-1-2".to_string()),
         end_time: Some(1.25),
         id: Some(7),
@@ -621,6 +623,7 @@ fn playing_wire_round_trip_and_legacy_json_omit_empty_additions() {
 
     let legacy = PlayingBody {
         events: vec![WirePlaying {
+            rest: false,
             epoch: None,
             end_time: None,
             id: None,
@@ -642,6 +645,7 @@ fn playing_wire_round_trip_and_legacy_json_omit_empty_additions() {
 #[test]
 fn publisher_keeps_committed_events_first_and_bounds_ahead_to_remaining_capacity() {
     let event = PlayingEvent {
+        rest: false,
         slot: intern_kw("d1"),
         beat: Ratio64::ZERO,
         time: 1.0,

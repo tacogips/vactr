@@ -103,7 +103,7 @@ export function applyStartup(
   if (!session.loadInitial(doc.underlying.text, doc.underlying.source, { restored: true })) return false;
   session.replace(doc.text, doc.source);
   const id = doc.source.kind === 'example' ? doc.source.id : 'document';
-  try { notice(`Opened ${id}; Undo (Mod-Z) restores your unsaved draft`); } catch { /* Status is best effort. */ }
+  try { notice(`Opened ${id}`); } catch { /* Status is best effort. */ }
   return true;
 }
 

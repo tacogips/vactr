@@ -281,6 +281,23 @@ impl DepGraph {
         self.bind_owner.get(&key).copied()
     }
 
+    /// Withdraws a removed live source's sink. Keeping its complete write set
+    /// makes the old form ineligible for reactive replay, including mixed forms
+    /// that also defined names whose current values must remain available.
+    pub(crate) fn retire_bind(&mut self, key: SlotKey, file: crate::reader::span::FileId) {
+        let Some(owner) = self.owner_of_bind(key) else {
+            return;
+        };
+        if self
+            .get(owner)
+            .is_none_or(|form| form.node.span.file != file)
+        {
+            return;
+        }
+        self.remove_current_span(owner);
+        self.bind_owner.remove(&key);
+    }
+
     /// The form whose committed generation is `gen`.
     #[must_use]
     pub fn form_of_gen(&self, gen: FormGen) -> Option<FormId> {

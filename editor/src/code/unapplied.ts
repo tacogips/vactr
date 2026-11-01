@@ -19,6 +19,17 @@ export class UnappliedEdits {
     let doc = this.doc;
     for (const change of changes.reverse()) {
       const touching = this.edits.filter(e => e.from <= change.to && e.to >= change.from);
+      const added = touching.length === 1 ? touching[0] : undefined;
+      if (added && added.before === '' && change.from >= added.from && change.to <= added.to) {
+        // Editing wholly inside pending added text cannot change the applied baseline.
+        // Keep its range without copying a potentially multi-megabyte document.
+        const delta = change.insert.length - (change.to - change.from);
+        this.edits = this.edits.filter(e => e !== added).map(e => e.from > change.to
+          ? { ...e, from: e.from + delta, to: e.to + delta } : e);
+        if (added.to + delta > added.from) this.edits.push({ ...added, to: added.to + delta, id: ++this.nextId, revision });
+        doc = ChangeSet.of({ from: change.from, to: change.to, insert: change.insert }, doc.length).apply(doc);
+        continue;
+      }
       const from = Math.min(change.from, ...touching.map(e => e.from));
       const to = Math.max(change.to, ...touching.map(e => e.to));
       // The merged region's original text: touching edits contribute their
@@ -99,6 +110,7 @@ export class UnappliedEdits {
   }
 
   annotations(doc: Text): CodeAnnotation[] {
-    return this.edits.map(e => ({ from: Math.min(e.from, doc.length), to: Math.min(e.to, doc.length), kind: 'unapplied' }));
+    return this.edits.map(e => ({ from: Math.min(e.from, doc.length), to: Math.min(e.to, doc.length), kind: 'unapplied',
+      editKind: e.from === e.to ? 'deletion' : e.before === '' ? 'addition' : 'modification' }));
   }
 }

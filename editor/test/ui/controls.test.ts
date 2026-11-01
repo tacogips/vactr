@@ -183,10 +183,12 @@ describe('eval outcome (design 15.2)', () => {
     expect(q('.vact-eval-status')?.dataset.status).toBe('ok');
   });
 
-  it('the Run button calls onRun', () => {
+  it('Update is disabled while stopped and Play calls onRun', () => {
     let runs = 0;
     const { q } = bar({ onRun: () => (runs += 1) });
     q<HTMLButtonElement>('.vact-run')?.click();
+    expect(runs).toBe(0);
+    q<HTMLButtonElement>('.vact-play-toggle')?.click();
     expect(runs).toBe(1);
     const noRun = bar();
     expect(noRun.q('.vact-run')).toBeNull();

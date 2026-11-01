@@ -733,6 +733,8 @@ pub struct DiagBody {
 /// One realized event.
 #[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
 pub struct WirePlaying {
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub rest: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub epoch: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]

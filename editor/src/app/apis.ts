@@ -41,6 +41,7 @@ export interface CodeRange { from: number; to: number }
 export interface CodeRect { left: number; right: number; top: number; bottom: number }
 export interface CodeAnnotation extends CodeRange {
   kind: 'unapplied' | 'syntax' | 'selection' | 'playing' | 'eval' | 'diagnostic' | 'binding' | 'composition' | 'call-head' | 'momentary';
+  editKind?: 'addition' | 'modification' | 'deletion';
   className?: string;
   label?: string;
 }

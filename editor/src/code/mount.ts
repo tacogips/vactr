@@ -46,7 +46,7 @@ function sameAnnotations(left: readonly CodeAnnotation[], right: readonly CodeAn
   return left.length === right.length && left.every((row, index) => {
     const other = right[index];
     return other !== undefined && row.from === other.from && row.to === other.to && row.kind === other.kind &&
-      row.className === other.className && row.label === other.label;
+      row.className === other.className && row.label === other.label && row.editKind === other.editKind;
   });
 }
 

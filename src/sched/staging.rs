@@ -17,7 +17,7 @@ use crate::clock::tempo::Tempo;
 use crate::pattern::eval::{InputCells, QueryCtx, QueryVm};
 use crate::pattern::occ::OccKey;
 use crate::pattern::pat::Pat;
-use crate::pattern::query::query;
+use crate::pattern::query::{query, query_playback};
 use crate::pattern::query::{sect, Event, TimeSpan};
 use crate::sched::ledger::Ledger;
 use crate::value::intern::KwId;
@@ -614,7 +614,7 @@ pub(crate) fn query_span(
         let piece = TimeSpan { begin, end: next };
         let mut cx = QueryCtx::new(vm, input, seed);
         cx.tempo = tempo;
-        let r = query(&lane.pat, piece, &mut cx);
+        let r = query_playback(&lane.pat, piece, &mut cx);
         faults.extend(r.faults);
         let mut evs = Vec::with_capacity(r.events.len());
         for e in r.events {

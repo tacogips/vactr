@@ -231,6 +231,7 @@ function transport(v: unknown): boolean {
 function validPlaying(v: unknown): boolean {
   if (!isObject(v) || typeof v.slot !== 'string' || !nonnegative(v.time) ||
     !ratio(v.beat) || !ratio(v.dur, true)) return false;
+  if (v.rest !== undefined && typeof v.rest !== 'boolean') return false;
   if (v.epoch !== undefined && !epoch(v.epoch)) return false;
   if (v.end_time !== undefined && (!nonnegative(v.end_time) || v.end_time < v.time)) return false;
   if (v.src !== undefined) {

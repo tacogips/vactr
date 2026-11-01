@@ -20,6 +20,7 @@ export const CURATED: readonly ManifestEntry[] = Object.freeze([
   { id: 'experimental-oscillators', title: 'Experimental Oscillators', description: 'Three paper-inspired oscillator studies: a VOSIM formant sweep, GENDYN spread, and scanned stiffness.', category: 'Examples' },
   { id: 'filter-lab', title: 'Filter Lab', description: 'See examples/effect-labs/ for each independently runnable variant. Sample-free effect audition. Persistent bus keeps tails between triggers', category: 'Examples', },
   { id: 'first-track', title: 'First Track', description: 'first track: a house sketch at 124 bpm, synths only', category: 'Examples', },
+  { id: 'indentation-guide', title: 'Indentation Guide', description: 'Tab-indented functions and multiline pipelines, repeated notes, rests, and nested steps.', category: 'Examples' },
   { id: 'fm6-algorithms', title: 'Fm6 Algorithms', description: 'Algorithm 0 keeps the legacy two-operator fm voice; 1 through 32 select six-operator topologies. Ratio, index and velocity shape the macro o', category: 'Examples', },
   { id: 'hurdy-gurdy', title: 'Hurdy Gurdy', description: 'Drones are per voice, so the drone pattern owns its sustained note independently.', category: 'Examples' },
   { id: 'industrial-techno-bass-rumble', title: 'Industrial Techno Bass Rumble', description: 'Bass-forward industrial techno preset: Peaks FM drum with Mutable Instruments voice adaptations. First four bars expose the bass; kick and k', category: 'Examples', },

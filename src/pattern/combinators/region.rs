@@ -215,7 +215,10 @@ fn rank_cycle(inner: &Pat, c: i64, st: &mut QState<'_, '_>) -> Result<Ranked, Fa
     // itself (or outside its span). Preserve legacy dropping only when
     // untraced; song realization must retain failures from the full cycle.
     let mark = st.faults.len();
+    // This widened query ranks notes; it is not playback of the entire cycle.
+    let capture = std::mem::replace(&mut st.rests.enabled, false);
     let events = query_child(inner, cycle, 0, st);
+    st.rests.enabled = capture;
     if !st.is_traced() {
         st.faults.truncate(mark);
     }

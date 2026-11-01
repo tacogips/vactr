@@ -130,7 +130,7 @@ fn cat_piece(
     };
     let child = piece.map(|t| t.checked_sub(shift))?;
     let ordinal = u32::try_from(i).unwrap_or(u32::MAX);
-    let events = if st.has_clock_observation() {
+    let events = if st.captures_timing() {
         st.with_clock_frame(
             || CanonicalClockFrame::iter(Ratio64::ZERO.checked_sub(shift)?, child, piece),
             |st| Ok(query_child(item, child, ordinal, st)),
@@ -170,7 +170,7 @@ pub(crate) fn query_fastcat(
     subtree(p, span.begin, st, |st| {
         let inner = span.map(|t| t.checked_mul(n))?;
         let mut out = Vec::new();
-        let events = if st.has_clock_observation() {
+        let events = if st.captures_timing() {
             st.with_clock_frame(
                 || CanonicalClockFrame::fast(n, inner, span),
                 |st| {
@@ -221,7 +221,7 @@ pub(crate) fn query_off(
         let shift = eval_param_ratio(t, Ratio64::from_int(span.begin.floor()), st)?;
         let transformed = apply_transform(f, inner, st)?;
         let child = span.map(|x| x.checked_sub(shift))?;
-        let events = if st.has_clock_observation() {
+        let events = if st.captures_timing() {
             st.with_clock_frame(
                 || CanonicalClockFrame::iter(Ratio64::ZERO.checked_sub(shift)?, child, span),
                 |st| Ok(transformed_child(&transformed, child, 1, st)),

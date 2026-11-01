@@ -188,6 +188,38 @@ describe('VimController input and shortcut pass-through', () => {
     }
     expect(host.state().doc.toString()).toBe('abc');
   });
+  it.each([
+    [['y', 'w'], 'one '], [['y', 'y'], 'one two'], [['v', 'l', 'y'], 'on'],
+    [['V', 'y'], 'one two'], [['"', 'a', 'y', 'w'], 'one '],
+  ] as const)('copies ordinary and named yanks to the clipboard: %j', async (keys, expected) => {
+    const host = createTestHost('|one two\nthree'), vim = new VimController(host);
+    for (const key of keys) vim.handleKey(event(key));
+    await Promise.resolve();
+    expect(host.memoryClipboard.value).toBe(expected);
+    expect(host.state().doc.toString()).toBe('one two\nthree');
+    vim.dispose();
+  });
+
+  it('preserves an ordinary yank internally if clipboard access is denied', async () => {
+    const host = createTestHost('|one'), vim = new VimController(host);
+    host.memoryClipboard.fail = true;
+    for (const key of ['y', 'y']) vim.handleKey(event(key));
+    await Promise.resolve(); await Promise.resolve();
+    expect(vim.snapshot.message).toContain('clipboard unavailable');
+    vim.handleKey(event('p'));
+    expect(host.state().doc.toString()).toBe('one\none');
+    vim.dispose();
+  });
+
+  it('does not copy black-hole yanks or ordinary deletes', async () => {
+    const host = createTestHost('|one two'), vim = new VimController(host);
+    host.memoryClipboard.value = 'keep';
+    for (const key of ['"', '_', 'y', 'w', 'd', 'w']) vim.handleKey(event(key));
+    await Promise.resolve();
+    expect(host.memoryClipboard.value).toBe('keep');
+    vim.dispose();
+  });
+
   it('writes a linewise + yank to the clipboard', async () => {
     const host = createTestHost('|one\ntwo'), vim = new VimController(host);
     vim.handleKey(event('"')); vim.handleKey(event('+')); vim.handleKey(event('y')); vim.handleKey(event('y'));

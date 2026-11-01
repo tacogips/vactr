@@ -22,7 +22,7 @@ describe('vactr decoration adapter', () => {
     expect(result.selection).toEqual([{ from: 1, to: 2 }]);
     expect(result.composition).toEqual([{ from: 2, to: 3 }]);
     expect(result.marks).toEqual([
-      { from: 3, to: 3, style: { background: unappliedRgba(DEFAULT_UNAPPLIED_COLOR), minWidth: 6 } },
+      { from: 3, to: 3, style: { background: unappliedRgba(DEFAULT_UNAPPLIED_COLOR), minWidth: 3 } },
       { from: 4, to: 5, style: { underline: { color: FALLBACK_PALETTE.diagnostic, thickness: 2 } } },
       { from: 5, to: 6, style: { underline: { color: FALLBACK_PALETTE.callHead, thickness: 1 } } },
       { from: 6, to: 7, style: { label: { text: 'binding' } } },

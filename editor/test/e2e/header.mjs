@@ -15,6 +15,13 @@ try {
     const browser = await launcher.launch({ headless: true });
     const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
     await installSilentSink(context);
+    await context.addInitScript(() => {
+      // Exercise the browser adapter without changing the host user's clipboard.
+      Object.defineProperty(navigator, 'clipboard', { configurable: true, value: {
+        writeText: async text => { window.__vactrTestClipboard = text; },
+        readText: async () => window.__vactrTestClipboard ?? '',
+      } });
+    });
     const page = await context.newPage();
     try {
       await page.goto(`${server.origin}/?perf=1`, { waitUntil: 'domcontentloaded' });
@@ -26,6 +33,7 @@ try {
       await page.waitForTimeout(500);
       assert.equal(await position.textContent(), '-.-');
       assert.equal(await page.locator('.vact-pause').isDisabled(), true);
+      assert.equal(await page.locator('.vact-run').isDisabled(), true);
       await page.screenshot({ path: path.join(output, `${engine}-desktop-stopped.png`) });
 
       const input = page.locator('.vact-code-input-bridge textarea');
@@ -41,6 +49,29 @@ try {
       await page.waitForTimeout(200);
       assert.equal(await status.textContent(), 'Stopped');
       assert.equal(await position.textContent(), '-.-');
+
+      await replaceDocument('let a 1\nlet b 2\ns [nil nil] > d1');
+      await page.locator('.vact-play-toggle').click();
+      await page.waitForFunction(() => document.querySelector('.vact-playback-state')?.textContent === 'Playing');
+      await page.locator('.vact-play-toggle').click();
+      await input.focus();
+      await input.press('ControlOrMeta+Home'); await input.press('End'); await input.press('Backspace');
+      await input.press('ArrowDown'); await input.press('End'); await input.press('Shift+ArrowLeft');
+      await page.keyboard.insertText('3');
+      await input.press('ControlOrMeta+End'); await page.keyboard.insertText('\n# addition');
+      assert.equal(await page.evaluate(() => window.__vactrPerf.doc()), 'let a \nlet b 3\ns [nil nil] > d1\n# addition');
+      await page.waitForTimeout(250);
+      await page.screenshot({ path: path.join(output, `${engine}-unapplied-colors.png`) });
+
+      await replaceDocument('s [nil nil] > d1');
+      await page.locator('.vact-play-toggle').click();
+      await page.waitForFunction(() => document.querySelector('.vact-playback-state')?.textContent === 'Playing');
+      assert.equal(await page.locator('.vact-run').isDisabled(), false);
+      await page.waitForFunction(() => window.__vactrPerf.onsets().some(event => event.from === 3 && event.to === 6));
+      await page.waitForFunction(() => window.__vactrPerf.presented().at(-1)?.activeKey.includes('3-6'));
+      await page.screenshot({ path: path.join(output, `${engine}-nil-active.png`) });
+      await page.locator('.vact-play-toggle').click();
+      assert.equal(await page.locator('.vact-run').isDisabled(), true);
 
       await replaceDocument('s :analog > note [60 64 67 72] > gain 0.1 > d1');
       await page.locator('.vact-play-toggle').click();
@@ -64,6 +95,21 @@ try {
       assert.equal(await status.getAttribute('data-state'), 'stopped');
       assert.equal(await position.textContent(), '-.-');
 
+      const removable = 's :analog > note [60 64 67 72] > gain 0.1 > d1';
+      await replaceDocument(removable);
+      await page.locator('.vact-play-toggle').click();
+      await page.waitForFunction(() => document.querySelector('.vact-playback-state')?.textContent === 'Playing');
+      await replaceDocument(`# ${removable}`);
+      await page.locator('.vact-run').click();
+      await page.waitForFunction(() => document.querySelector('.vact-eval-status')?.dataset.status === 'ok'
+        && window.__vactrPerf.transportSample()?.active === false);
+      assert.equal(await status.textContent(), 'Stopped');
+      assert.equal(await page.locator('.vact-run').isDisabled(), true);
+      const accepted = await page.evaluate(() => window.__vactrPerf.counters().highlight.accepted);
+      await page.waitForTimeout(1200);
+      assert.equal(await page.evaluate(() => window.__vactrPerf.counters().highlight.accepted), accepted);
+      await page.screenshot({ path: path.join(output, `${engine}-comment-update-stopped.png`) });
+
       await page.locator('.vact-editor-options summary').click();
       assert.equal(await page.locator('.vact-editor-options').getAttribute('open'), '');
       await page.keyboard.press('Escape');
@@ -72,6 +118,32 @@ try {
       await page.locator('.vact-doc-picker-filter').waitFor({ state: 'visible' });
       await page.keyboard.press('Escape');
       assert.equal(await page.locator('.vact-doc-picker').count(), 0);
+
+      await page.locator('.vact-editor-options summary').click();
+      await page.locator('.vact-vim-toggle').click();
+      await page.keyboard.press('Escape');
+      await input.focus();
+      await input.press('x'); await input.press('u');
+      const beforeLoad = await page.evaluate(() => window.__vactrPerf.doc());
+      await input.press('y'); await input.press('y');
+      await page.waitForFunction(expected => window.__vactrTestClipboard === expected, beforeLoad.split('\n')[0]);
+      await page.locator('.vact-doc-picker-toggle').click();
+      await page.locator('.vact-doc-picker-item').filter({ hasText: 'Acid' }).first().click();
+      await page.getByRole('button', { name: 'Replace', exact: true }).click();
+      await page.waitForFunction(before => window.__vactrPerf.doc() !== before, beforeLoad);
+      const loaded = await page.evaluate(() => window.__vactrPerf.doc());
+      await input.focus(); await input.press('Control+r');
+      assert.equal(await page.evaluate(() => window.__vactrPerf.doc()), loaded);
+      await input.press('x');
+      const edited = await page.evaluate(() => window.__vactrPerf.doc());
+      assert.notEqual(edited, loaded);
+      await input.press('u');
+      assert.equal(await page.evaluate(() => window.__vactrPerf.doc()), loaded);
+      await input.press('Control+r');
+      assert.equal(await page.evaluate(() => window.__vactrPerf.doc()), edited);
+      await page.locator('.vact-editor-options summary').click();
+      await page.locator('.vact-vim-toggle').click();
+      await page.keyboard.press('Escape');
 
       for (const width of [1440, 768, 390]) {
         await page.setViewportSize({ width, height: 900 });

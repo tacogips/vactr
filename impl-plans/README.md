@@ -11,14 +11,14 @@ These plans implement [design-emaki.md](../design-docs/specs/design-emaki.md) on
 
 vactr then consumes emaki through `file:../emaki` and gains beat-glow marks, an inline sequencer, an inline oscilloscope and a persisted toggle.
 
-Status: gates passed; awaiting final integration review. vactr vitest 2370/2370, emaki vitest 139/139, examples e2e 8/8, and emaki perf allPass in both browsers; style and behavior e2e have only the recorded rule-13 baseline failures. Common execution rules are in [emaki-00-rules.md](active/emaki-00-rules.md), and the manifest is [emaki-dispatch.json](active/emaki-dispatch.json).
+Status: Completed (closeout in workflow session 626). The design status is Implemented, and the verification record is section 19 of design-emaki.md. Results: vactr vitest 2370/2370, emaki vitest 139/139 (2509 = baseline 2401 + 108 new tests), examples e2e 8/8, emaki perf allPass in Chromium and WebKit, and canvas measure run emaki-001 passing in both browsers. vactr test:style and behavior e2e (39/54) still exit 1, with only the recorded rule-13 pre-existing baseline failures; they are not clean passes. Remaining operator work: physical iPad/WKWebView checks, and the copy into tacogips/emaki with the switch to `github:tacogips/emaki#<sha>`. Common execution rules are in [emaki-00-rules.md](completed/emaki-00-rules.md), and the manifest is [emaki-dispatch.json](active/emaki-dispatch.json).
 
-- **Wave 1**: [EMK-CORE scaffold, contract types and engine extraction](active/emaki-10-core.md)
-- **Wave 2** (parallel): [EMK-DECOR marks, glow and line formats](active/emaki-20-decor.md), [EMK-WIDGETS widgets and vertical motion](active/emaki-21-widgets.md), [EMK-LANG incremental highlighter, JSON and fixture](active/emaki-22-lang.md), [EMK-DIFF diff module](active/emaki-23-diff.md)
-- **Wave 3** (parallel): [EMK-API plugin runtime, createEditor and README](active/emaki-30-api.md), [EMK-VAC-SWITCH vactr consumes emaki](active/emaki-31-vactr-switch.md)
-- **Wave 4** (parallel): [EMK-DIFF-DEMO](active/emaki-40-diff-demo.md), [EMK-JSON-DEMO](active/emaki-41-json-demo.md), [EMK-SHOWCASE](active/emaki-42-showcase.md), [EMK-VAC-PLUGINS beat glow, sequencer, scope and toggle](active/emaki-43-vactr-plugins.md)
-- **Wave 5**: [EMK-PERF perf script and budget gates](active/emaki-50-perf.md)
-- **Wave 6**: [EMK-CLOSEOUT full gates, docs and tasks](active/emaki-60-closeout.md)
+- **Wave 1**: [EMK-CORE scaffold, contract types and engine extraction](completed/emaki-10-core.md)
+- **Wave 2** (parallel): [EMK-DECOR marks, glow and line formats](completed/emaki-20-decor.md), [EMK-WIDGETS widgets and vertical motion](completed/emaki-21-widgets.md), [EMK-LANG incremental highlighter, JSON and fixture](completed/emaki-22-lang.md), [EMK-DIFF diff module](completed/emaki-23-diff.md)
+- **Wave 3** (parallel): [EMK-API plugin runtime, createEditor and README](completed/emaki-30-api.md), [EMK-VAC-SWITCH vactr consumes emaki](completed/emaki-31-vactr-switch.md)
+- **Wave 4** (parallel): [EMK-DIFF-DEMO](completed/emaki-40-diff-demo.md), [EMK-JSON-DEMO](completed/emaki-41-json-demo.md), [EMK-SHOWCASE](completed/emaki-42-showcase.md), [EMK-VAC-PLUGINS beat glow, sequencer, scope and toggle](completed/emaki-43-vactr-plugins.md)
+- **Wave 5**: [EMK-PERF perf script and budget gates](completed/emaki-50-perf.md)
+- **Wave 6**: [EMK-CLOSEOUT full gates, docs and tasks](completed/emaki-60-closeout.md)
 
 ## Unapplied edit highlights (2026-10-23)
 

@@ -11,7 +11,7 @@ These plans implement [design-emaki.md](../design-docs/specs/design-emaki.md) on
 
 vactr then consumes emaki through `file:../emaki` and gains beat-glow marks, an inline sequencer, an inline oscilloscope and a persisted toggle.
 
-Status: Ready. The plans are not yet implemented. Common execution rules are in [emaki-00-rules.md](active/emaki-00-rules.md), and the manifest is [emaki-dispatch.json](active/emaki-dispatch.json).
+Status: gates passed; awaiting final integration review. vactr vitest 2370/2370, emaki vitest 139/139, examples e2e 8/8, and emaki perf allPass in both browsers; style and behavior e2e have only the recorded rule-13 baseline failures. Common execution rules are in [emaki-00-rules.md](active/emaki-00-rules.md), and the manifest is [emaki-dispatch.json](active/emaki-dispatch.json).
 
 - **Wave 1**: [EMK-CORE scaffold, contract types and engine extraction](active/emaki-10-core.md)
 - **Wave 2** (parallel): [EMK-DECOR marks, glow and line formats](active/emaki-20-decor.md), [EMK-WIDGETS widgets and vertical motion](active/emaki-21-widgets.md), [EMK-LANG incremental highlighter, JSON and fixture](active/emaki-22-lang.md), [EMK-DIFF diff module](active/emaki-23-diff.md)

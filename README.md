@@ -177,6 +177,11 @@ automated proxy is a recording-host test.
 
 ## Editor
 
+The code editor engine is the [emaki library](emaki/), consumed via
+`file:../emaki` (later `github:tacogips/emaki#<sha>`). It supplies beat glow
+and inline sequencer and oscilloscope widgets. Use the **Inline widgets**
+toggle to control them; the setting is persisted as `vactr.inlineWidgets`.
+
 The editor (TASK-010/011, design `design-docs/specs/design-implementation.md`
 15.1, 15.2, 15.3) is a Vite + TypeScript app in `editor/` with Solid.js
 views and a WebGL2 canvas code surface. Code text, cursor, selection,
@@ -453,6 +458,9 @@ that is half patterns and half visuals. The command is `vactr`; source
 files use the `.vact` extension.
 
 ## Development
+
+For emaki, run `mise run emaki-check`, `mise run emaki-test`,
+`mise run emaki-build`, `mise run emaki-perf`, and `mise run emaki-e2e`.
 
 Tools are managed by mise (`mise install`). Rust is pinned to 1.83.
 

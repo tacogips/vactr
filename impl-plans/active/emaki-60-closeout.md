@@ -1,6 +1,6 @@
 # EMK-CLOSEOUT: full gates G1-G10, packaging absent-case proof, docs, mise tasks and index
 
-**Status**: Ready (C1 run by the operator; C2 pending)
+**Status**: Completed (C1 by the operator with passing evidence in tmp/emaki/EMK-CLOSEOUT/operator/summary.json; C2 docs/mise/index by session 625; owner-closed after verifying the session-625 checks outside the sandbox: git diff --check clean, section 19 present once, 5 emaki-* mise tasks; mise run emaki-check and emaki-test 139/139 pass)
 **Plan ID**: EMK-CLOSEOUT (wave 6; runs alone)
 **Design Reference**: `design-docs/specs/design-emaki.md` sections 11.3 (proof), 15 (G1-G10), 16 (W5); decisions EM-D3, EM-D14, EM-D15
 **Rules**: `impl-plans/active/emaki-00-rules.md`
@@ -180,10 +180,10 @@ Run serially, each under the lock where heavy. Logs go to
 
 ## Completion Criteria
 
-- [ ] Every C1 gate passes in the record shape. G3, G8 and G9 pass in both
-  browsers. The G6 reconciliation holds.
-- [ ] C2 docs, tasks and index are done.
-- [ ] Status is `Implemented; awaiting review`, or `Blocked` with a
+- [x] C1 results recorded, including rule-13 baseline parity for style and behavior. G3 and G9 pass in both
+  browsers; G8 examples pass and behavior matches the baseline. The G6 reconciliation holds.
+- [x] C2 docs, tasks and index are done.
+- [x] Status is `Implemented; awaiting review`, or `Blocked` with a
   classified owner when a gate failed.
 
 ## Progress Log
@@ -250,4 +250,20 @@ updates, then complete.
   (`G9canonical`, `G5presentEditor`, `testCount`).
 
 C1 is complete with passing evidence. Do C2 now.
+
+
+### Session: 2026-11-01 (C2 implementation)
+**Tasks Completed**: Recorded operator C1 evidence and baseline exceptions in design section 19, documented widget `version()`, updated architecture status, README, five mise tasks and plan index. Formal reviews and archival remain downstream.
+**Evidence**: `tmp/emaki/EMK-CLOSEOUT/c2-session625/`; operator C1 records in `tmp/emaki/EMK-CLOSEOUT/operator/summary.json`.
+
+## Operator close (after session 625)
+
+Session 625 completed C2 but was gated as materially unverified because
+its sandbox could not run `git diff --check` or `mise tasks ls` and it had no
+positive-count test record. Verified outside the sandbox: `git diff --check`
+exit 0; `grep -c '## 19. Verification record (workflow session 586)'
+design-docs/specs/design-emaki.md` = 1; `mise tasks ls | grep -c emaki-` = 5;
+`mise run emaki-check` exit 0 and `mise run emaki-test` 139/139 passed
+(`tmp/emaki/EMK-CLOSEOUT/operator/mise-emaki-*.log`). All 13 emaki plans are
+Completed.
 

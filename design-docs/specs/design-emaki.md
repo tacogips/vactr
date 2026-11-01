@@ -1,7 +1,6 @@
 # emaki: Standalone Canvas Editor Library and vactr Adoption
 
-**Status:** Proposed (2026-10-31). Author proposal for adversarial review. No
-implementation, performance or device acceptance is claimed here.
+**Status:** Implemented (2026-10-31, workflow session 586).
 
 **Issue reference:** workflowInput issue "Extract vactr's canvas editor into
 the standalone emaki library (staged at emaki/) with plugins, range/line
@@ -431,7 +430,9 @@ They do not edit. The vactr plugins and the diff demo need nothing more.
   - `{ kind: 'dom', mount(el: HTMLElement): () => void }`, for arbitrary DOM
     such as `<video>`, images or HTML;
   - `{ kind: 'canvas', draw(ctx: CanvasRenderingContext2D, info: { width, height, dpr, frameMs }): boolean }`.
-    `draw` returns `true` to keep animating.
+    `draw` returns `true` to keep animating. An optional `version()` returns a
+    change token; while animating, repaint occurs only when that token changes.
+    Without `version()`, animated content repaints each requested frame.
 - `host.widgets(owner).set(specs)` reconciles by `key`. A widget with an
   unchanged key and content kind keeps its mounted element. Changed `height`
   or `side` updates the heightmap. Anchors map with assoc -1. A widget is
@@ -467,7 +468,8 @@ prefix sums of the extra height.
   bounds avoids mount/unmount churn while scrolling.
 - **Canvas widgets.** `draw` runs only while the widget is mounted and its rect
   intersects the actual viewport (not the overscan), and only while it
-  returned `true` last time or its spec changed.
+  returned `true` last time or its spec changed, subject to the optional
+  `version()` change token above.
 - **WidgetLayer.** This is one absolutely positioned container above the code
   canvas, clipped to the text area. In the frame callback, after the WebGL
   render, it receives a `translate` equal to `-scrollTop` and
@@ -1025,3 +1027,64 @@ transitional and removed by W3(a). The final state has no duplicate engine
 - **Large Myers cost.** Replacing many lines can push the cost high. The cap
   turns it into one replace hunk, which may show a coarser diff than GitHub
   for huge rewrites. This is acceptable for the 100 ms visible-latency gate.
+
+
+## 19. Verification record (workflow session 586)
+
+C1 was run serially by the operator under the measurement lock; the complete records and earlier timing-sensitive attempts are in `tmp/emaki/EMK-CLOSEOUT/operator/summary.json`. Counts below are passed/run; 0/0 denotes a non-test or a harness without reported test counts. The style and behavior commands exited 1: their failures match the pre-existing rule-13 baseline, not a clean raw pass. Behavior ran 54 checks, 39 passed; examples passed 8/8. The earlier G9 measurement failed and was superseded by the canonical run after the widget repaint repair.
+
+| Gate | Command | Exit | Passed/run | Log |
+|---|---|---:|---:|---|
+| G1 | `cd . && cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm` | 0 | 0/0 | `tmp/emaki/EMK-CLOSEOUT/operator/G1.log` |
+| G2-clean | `cd emaki && bash -c rm -rf node_modules dist && npm ci --prefer-offline --no-audit --no-fund` | 0 | 0/0 | `tmp/emaki/EMK-CLOSEOUT/operator/G2-clean.log` |
+| G2-check | `cd emaki && npm run check` | 0 | 0/0 | `tmp/emaki/EMK-CLOSEOUT/operator/G2-check.log` |
+| G2-test | `cd emaki && npm test` | 0 | 138/138 | `tmp/emaki/EMK-CLOSEOUT/operator/G2-test.log` |
+| G2-build | `cd emaki && npm run build` | 0 | 0/0 | `tmp/emaki/EMK-CLOSEOUT/operator/G2-build.log` |
+| G5-editor-ci | `cd editor && bash -c rm -rf node_modules && npm ci --prefer-offline --no-audit --no-fund` | 0 | 0/0 | `tmp/emaki/EMK-CLOSEOUT/operator/G5-editor-ci.log` |
+| G5-editor-check | `cd editor && npm run check` | 0 | 0/0 | `tmp/emaki/EMK-CLOSEOUT/operator/G5-editor-check.log` |
+| G5-single-instance | `cd editor && ./node_modules/.bin/vitest run test/code/emaki-single-instance.test.ts` | 0 | 1/1 | `tmp/emaki/EMK-CLOSEOUT/operator/G5-single-instance.log` |
+| G5-emaki-ci | `cd emaki && npm ci --prefer-offline --no-audit --no-fund` | 0 | 0/0 | `tmp/emaki/EMK-CLOSEOUT/operator/G5-emaki-ci.log` |
+| G5-present-check | `cd emaki && npm run check` | 0 | 0/0 | `tmp/emaki/EMK-CLOSEOUT/operator/G5-present-check.log` |
+| G5-present-test | `cd emaki && npm test` | 0 | 138/138 | `tmp/emaki/EMK-CLOSEOUT/operator/G5-present-test.log` |
+| G5-present-build | `cd emaki && npm run build` | 0 | 0/0 | `tmp/emaki/EMK-CLOSEOUT/operator/G5-present-build.log` |
+| G6 | `cd editor && env VACTR_WASM=../target/wasm32-unknown-unknown/debug/deps/vactr.wasm ./node_modules/.bin/vitest run` | 0 | 2370/2370 | `tmp/emaki/EMK-CLOSEOUT/operator/G6.log` |
+| G7-wasm-release | `cd . && mise run build-wasm-release` | 0 | 0/0 | `tmp/emaki/EMK-CLOSEOUT/operator/G7-wasm-release.log` |
+| G7-editor-build | `cd editor && env VACTR_REQUIRE_SESSION_ABI=1 npm run build` | 0 | 0/0 | `tmp/emaki/EMK-CLOSEOUT/operator/G7-editor-build.log` |
+| G7-test-style | `cd editor && npm run test:style` | 1 | 0/0 | `tmp/emaki/EMK-CLOSEOUT/operator/G7-test-style.log` |
+| G8-e2e-behavior | `cd editor && npm run e2e -- --browser all --profile behavior --out ../tmp/emaki/EMK-CLOSEOUT/e2e` | 1 | 0/0 | `tmp/emaki/EMK-CLOSEOUT/operator/G8-e2e-behavior.log` |
+| G8-e2e-examples | `cd editor && npm run e2e:examples` | 0 | 0/0 | `tmp/emaki/EMK-CLOSEOUT/operator/G8-e2e-examples.log` |
+| G3-emaki-build | `cd emaki && npm run build` | 0 | 0/0 | `tmp/emaki/EMK-CLOSEOUT/operator/G3-emaki-build.log` |
+| G3-perf | `cd emaki && npm run perf -- --browser all --out ../tmp/emaki/EMK-CLOSEOUT/perf` | 0 | 0/0 | `tmp/emaki/EMK-CLOSEOUT/operator/G3-perf.log` |
+| G4-emaki-e2e | `cd emaki && npm run e2e -- --browser all --out ../tmp/emaki/EMK-CLOSEOUT/e2e-emaki` | 0 | 0/0 | `tmp/emaki/EMK-CLOSEOUT/operator/G4-emaki-e2e.log` |
+| G4-smoke | `cd emaki && node scripts/smoke.mjs --browser all --out ../tmp/emaki/EMK-CLOSEOUT/smoke` | 0 | 0/0 | `tmp/emaki/EMK-CLOSEOUT/operator/G4-smoke.log` |
+| G10-tauri | `cd . && cargo test --manifest-path editor/src-tauri/Cargo.toml` | 0 | 17/17 | `tmp/emaki/EMK-CLOSEOUT/operator/G10-tauri.log` |
+| B-emaki-boundary | `cd emaki && ./node_modules/.bin/vitest run test/boundary.test.ts` | 0 | 2/2 | `tmp/emaki/EMK-CLOSEOUT/operator/B-emaki-boundary.log` |
+| B-editor-boundary | `cd editor && ./node_modules/.bin/vitest run test/code/emaki-boundary.test.ts` | 0 | 2/2 | `tmp/emaki/EMK-CLOSEOUT/operator/B-editor-boundary.log` |
+| G6-after-inline-optimization | `cd editor && VACTR_WASM=../target/wasm32-unknown-unknown/debug/deps/vactr.wasm ./node_modules/.bin/vitest run` | 0 | 2370/2370 | `tmp/emaki/EMK-CLOSEOUT/operator/G6-rerun.log` |
+| G2-test-after-inline-optimization | `cd emaki && ./node_modules/.bin/vitest run` | 0 | 139/139 | `tmp/emaki/EMK-CLOSEOUT/operator/G2-test-rerun.log` |
+| G5 present editor 1 | `cd editor && rm -rf node_modules && npm ci --prefer-offline` | 0 | 0/0 | `tmp/emaki/EMK-CLOSEOUT/operator/G5-present-editor-ci.log` |
+| G5 present editor 2 | `cd editor && npm run check` | 0 | 0/0 | `tmp/emaki/EMK-CLOSEOUT/operator/G5-present-editor-check.log` |
+| G5 present editor 3 | `cd editor && ./node_modules/.bin/vitest run test/code/emaki-single-instance.test.ts` | 0 | 1/1 | `tmp/emaki/EMK-CLOSEOUT/operator/G5-present-single-instance.log` |
+| G9 canonical | `cd editor && npm run e2e -- --browser all --profile measure --write-evidence --run-id emaki-001` | 0 | 0/0 | `tmp/emaki/EMK-CLOSEOUT/operator/G9-emaki-001.log` |
+
+G3 emaki performance (ms except ratio; all gates passed):
+
+| Browser | First paint | Scroll work p95 | Key work p95 | Diff latency p95 | Next-frame ratio | Size scaling |
+|---|---:|---:|---:|---:|---:|---:|
+| Chromium | 101.2 | 5.6 | 8.3 | 30.5 | 1 | 8.1 |
+| WebKit | 126 | 6 | 11 | 30 | 1 | 10 |
+
+G9 canonical `emaki-001` (ms; evidence `design-docs/specs/evidence/canvas-cutover/emaki-001/`):
+
+| Browser | Input p95 ≤50 | Text work p95 ≤8 | Animation p95 ≤8 | Frame interval p95 ≤20 | Sync p99 | Ledger after dispose |
+|---|---:|---:|---:|---:|---:|---:|
+| Chromium | 15.8 | 6.7 | 0.4 | 17.5 | 49.5 | 0 bytes |
+| WebKit | 18 | 8 | 1 | 19 | 45.7 | 0 bytes |
+
+The 4 ms text-dirty target was missed in both browsers; it is a target, while 8 ms is the gate. The original run exposed a sync regression; `version()` and anchor-change-only republishing repaired it. The canonical run has no harness failures.
+
+G5: `emaki/node_modules` was absent for the first editor clean install and present for the second; both editor installs, checks and single-instance tests passed. In both cases `editor/node_modules/emaki` linked to `../../emaki`. See `tmp/emaki/EMK-CLOSEOUT/operator/G5-install-state.txt` and `G5-present-install-state.txt`.
+
+G6: vactr 2370 + emaki 139 = 2509, equal to the measured 2401 baseline + 108 new tests and above 2384 + 108. All five moved files retain their counts (42 total); details: `tmp/emaki/EMK-CLOSEOUT/test-count.json`. Boundary tests passed 2/2 each; the operator reports no vactr imports in emaki and maximum touched source length 843 lines. Wave joins are recorded under `tmp/emaki/wave-2-join/`, `tmp/emaki/wave-3-join/`, `tmp/emaki/wave-4-join/`, and `tmp/emaki/wave-5-join/`.
+
+Physical iPad/WKWebView validation remains an operator activity; WebKit Playwright is the automated proxy. EQ1–EQ6 defaults were applied. Section 8.4's PageUp/PageDown snapping sentence describes browser scrolling: `KeyboardController` does not handle those keys, either before or after this work.

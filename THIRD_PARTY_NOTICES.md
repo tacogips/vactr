@@ -1,5 +1,7 @@
 # Third-party notices
 
+Since 2026-10-31 the DSP sources covered below live in the in-tree crates under `music-things/crates/`; their staged notices are in `music-things/THIRD_PARTY_NOTICES.md`.
+
 ## Optional local source-comparison probe
 
 `verification/compare_plaits_fm.py` can compile the official Plaits FM engine
@@ -152,7 +154,7 @@ coverage manifest label.
 
 ## Clouds granular texture architectural adaptation
 
-`texture-grain` and `src/dsp/effects/texture.rs` adapt the stereo capture,
+`texture-grain` and `music-things/crates/music-things-fx/src/texture.rs` adapt the stereo capture,
 grain scheduling, position, size, pitch, density, texture/window, spread,
 feedback, freeze, trigger and gate roles from
 `clouds/dsp/granular_processor.{h,cc}`,
@@ -170,7 +172,7 @@ adaptation, not a bit-exact source port.
 
 ## Clouds stretch texture architectural adaptation
 
-`texture-stretch` and `src/dsp/effects/texture_stretch.rs` use the two-window
+`texture-stretch` and `music-things/crates/music-things-fx/src/texture_stretch.rs` use the two-window
 overlap-add and alignment-search architecture described in the MIT-licensed
 `clouds/dsp/wsola_sample_player.h`, `window.h`, `correlator.{h,cc}`,
 `granular_processor.{h,cc}`, `audio_buffer.h` and `parameters.h` at
@@ -189,7 +191,7 @@ imported. This is an adaptation, not a bit-exact source port.
 
 ## Clouds looping texture architectural adaptation
 
-`texture-loop` and `src/dsp/effects/texture_loop.rs` follow the live-delay,
+`texture-loop` and `music-things/crates/music-things-fx/src/texture_loop.rs` follow the live-delay,
 freeze-loop, tap-synchronization and wrap-crossfade roles of
 `clouds/dsp/looping_sample_player.h`, `granular_processor.{h,cc}`,
 `fx/pitch_shifter.h` and `parameters.h` in `pichenettes/eurorack` revision
@@ -213,7 +215,7 @@ This is an adaptation, not a bit-exact Clouds looping-delay port.
 
 ## Clouds spectral texture architectural adaptation
 
-`texture-spectral` and `src/dsp/effects/texture_spectral.rs` adapt the
+`texture-spectral` and `music-things/crates/music-things-fx/src/texture_spectral.rs` adapt the
 stereo STFT overlap-add, spectral history, magnitude warping, pitch shift,
 quantization, phase decorrelation and gate-glitch roles in
 `clouds/dsp/pvoc/{stft,frame_transformation,phase_vocoder}.{h,cc}` and
@@ -257,7 +259,7 @@ resource, generated table or audio sample is copied into or linked with Vactr.
 
 ## Plaits position 14 chord-layer architectural adaptation
 
-`chord-layer-voice` and `src/dsp/ugen/chord_pair.rs` adapt the four-note
+`chord-layer-voice` and `music-things/crates/music-things-synth/src/chord_pair.rs` adapt the four-note
 chord bank, five-slot inversion crossfade, divide-down registration,
 wave-layer blend, full-chord main and inversion-note auxiliary roles in
 `plaits/dsp/engine/chord_engine.{h,cc}`,
@@ -282,7 +284,7 @@ source-stage-complete port.
 
 ## Plaits position 13 procedural wave-grid adaptation
 
-`wave-grid-voice` and `src/dsp/ugen/table_terrain_pair.rs` adapt the
+`wave-grid-voice` and `music-things/crates/music-things-synth/src/table_terrain_pair.rs` adapt the
 three-axis 8×8 grid scan, mirrored bank navigation, smoothing and 1/32-step
 auxiliary role in `plaits/dsp/engine/wavetable_engine.{h,cc}` at
 `pichenettes/eurorack` revision
@@ -304,7 +306,7 @@ bit-exact port.
 
 ## Plaits position 5 wave-terrain architectural adaptation
 
-`terrain-voice` and `src/dsp/ugen/terrain_pair.rs` adapt the elliptical
+`terrain-voice` and `music-things/crates/music-things-synth/src/terrain_pair.rs` adapt the elliptical
 quadrature path, five analytic terrain roles, terrain selection and
 transformed auxiliary role from
 `plaits/dsp/engine2/wave_terrain_engine.{h,cc}` at
@@ -328,7 +330,7 @@ source. This is an adaptation, not a source-stage-complete or bit-exact port.
 
 ## Plaits position 6 string-machine architectural adaptation
 
-`string-machine-voice` and `src/dsp/ugen/string_machine_pair.rs` adapt the
+`string-machine-voice` and `music-things/crates/music-things-synth/src/string_machine_pair.rs` adapt the
 four divide-down chord voices, stereo filters and ensemble roles from
 `plaits/dsp/engine2/string_machine_engine.{h,cc}`,
 `plaits/dsp/chords/chord_bank.{h,cc}`,
@@ -352,7 +354,7 @@ architectural adaptation, not a source-stage-complete or bit-exact port.
 
 ## Plaits position 9 waveshaping architectural adaptation
 
-`shape-voice` and `src/dsp/ugen/shape_pair.rs` adapt the slope-oscillator,
+`shape-voice` and `music-things/crates/music-things-synth/src/shape_pair.rs` adapt the slope-oscillator,
 waveshaper, fold and overtone/sine output roles from
 `plaits/dsp/engine/waveshaping_engine.{h,cc}` and
 `plaits/dsp/oscillator/oscillator.h` at `pichenettes/eurorack` revision
@@ -371,7 +373,7 @@ architectural adaptation, not a source-stage-complete or bit-exact port.
 
 ## Plaits position 11 grain oscillator source-stage translation
 
-`grain-pair-voice` and `src/dsp/ugen/grain_pair.rs` translate the two-grainlet
+`grain-pair-voice` and `music-things/crates/music-things-synth/src/grain_pair.rs` translate the two-grainlet
 main, Z-oscillator auxiliary and separate high-pass output roles in
 `plaits/dsp/engine/grain_engine.{h,cc}` and
 `plaits/dsp/oscillator/grainlet_oscillator.h`, `z_oscillator.h` at
@@ -394,7 +396,7 @@ waveform table, DX7/LXR data, or external audio asset is imported.
 
 ## Plaits position 8 virtual-analog architectural adaptation
 
-`analog-pair-voice` and `src/dsp/ugen/analog_pair.rs` implement the
+`analog-pair-voice` and `music-things/crates/music-things-synth/src/analog_pair.rs` implement the
 `VA_VARIANT 2` roles in `plaits/dsp/engine/virtual_analog_engine.{h,cc}`:
 variable square plus variable saw on main, and the difference between two
 synchronized variable-shape oscillators on auxiliary. The source and
@@ -414,7 +416,7 @@ source-stage-complete port, and it is distinct from position 0's filter voice.
 
 ## Plaits position 7 chiptune architectural adaptation
 
-`chip-voice` and `src/dsp/ugen/chip_pair.rs` adapt the chord/arpeggio,
+`chip-voice` and `music-things/crates/music-things-synth/src/chip_pair.rs` adapt the chord/arpeggio,
 five-square main and stepped-triangle bass auxiliary roles from
 `plaits/dsp/engine2/chiptune_engine.{h,cc}`,
 `plaits/dsp/chords/chord_bank.{h,cc}`,
@@ -439,7 +441,7 @@ This is an adaptation, not a source-stage or bit-exact port.
 
 ## Plaits position 19 three-string architectural adaptation
 
-`string-voice` and `src/dsp/ugen/string_pair.rs` adapt the filtered noise or
+`string-voice` and `music-things/crates/music-things-synth/src/string_pair.rs` adapt the filtered noise or
 dust excitation, three Karplus–Strong delay and stretch lines, nonlinear
 bridge/dispersion roles and separate resonant main / filtered-excitation
 auxiliary outputs from `plaits/dsp/engine/string_engine.{h,cc}` and
@@ -462,7 +464,7 @@ or bit-exact port.
 
 ## Plaits position 20 modal MIT source-stage translation
 
-`modal-voice` and `src/dsp/ugen/modal_pair.rs` translate the filtered strike or
+`modal-voice` and `music-things/crates/music-things-synth/src/modal_pair.rs` translate the filtered strike or
 continuous dust excitation, 24-mode resonator and separate resonant main /
 filtered-excitation auxiliary architecture from
 `plaits/dsp/engine/modal_engine.{h,cc}`,
@@ -485,7 +487,7 @@ stage translation, not a bit-exact source port.
 
 ## Plaits position 18 particle architectural adaptation
 
-`particle-voice` and `src/dsp/ugen/particle_pair.rs` are a bounded Rust
+`particle-voice` and `music-things/crates/music-things-synth/src/particle_pair.rs` are a bounded Rust
 adaptation of the six-particle impulse/resonator roles and main/aux output
 roles in `plaits/dsp/engine/particle_engine.{h,cc}` and
 `plaits/dsp/noise/particle.h` from `pichenettes/eurorack` revision
@@ -506,7 +508,7 @@ bit-exact or source-stage-complete port.
 
 ## Plaits position 16 swarm MIT translation
 
-`swarm-voice` and `src/dsp/ugen/swarm_pair.rs` translate the eight ranked
+`swarm-voice` and `music-things/crates/music-things-synth/src/swarm_pair.rs` translate the eight ranked
 grains, spread/density/size controls, random grain scheduling, two-sample
 BLEP saw and auxiliary sine in `plaits/dsp/engine/swarm_engine.{h,cc}` from
 `pichenettes/eurorack` revision
@@ -539,7 +541,7 @@ make sample correlation descriptive for noise-driven output.
 
 ## Plaits position 23 dual hi-hat MIT translation
 
-`dual-hat-voice` and `src/dsp/ugen/hat_pair/` translate the square-noise
+`dual-hat-voice` and `music-things/crates/music-things-synth/src/hat_pair/` translate the square-noise
 and ring-mod-noise architectures in `plaits/dsp/engine/hi_hat_engine.{h,cc}`
 and `plaits/dsp/drums/hi_hat.h` from `pichenettes/eurorack` revision
 `08460a69a7e1f7a81c5a2abcc7189c9a6b7208d4`. These files and the
@@ -570,7 +572,7 @@ probe" above for the shared probe terms.
 
 ## Plaits position 22 dual snare-drum MIT translation
 
-`dual-snare-voice` and `src/dsp/ugen/snare_pair/` translate the analog-main
+`dual-snare-voice` and `music-things/crates/music-things-synth/src/snare_pair/` translate the analog-main
 and synthetic-auxiliary stages in `plaits/dsp/engine/snare_drum_engine.{h,cc}`
 and `plaits/dsp/drums/{analog_snare_drum,synthetic_snare_drum}.h` from
 `pichenettes/eurorack` revision
@@ -605,7 +607,7 @@ probe terms.
 
 ## Plaits position 21 dual bass-drum MIT translation
 
-`dual-kick-voice` and `src/dsp/ugen/dual_kick/` translate the analog-main
+`dual-kick-voice` and `music-things/crates/music-things-synth/src/dual_kick/` translate the analog-main
 and synthetic-auxiliary stages in `plaits/dsp/engine/bass_drum_engine.{h,cc}`,
 `plaits/dsp/drums/{analog_bass_drum,synthetic_bass_drum}.h`, and
 `plaits/dsp/fx/overdrive.h` from `pichenettes/eurorack` revision
@@ -637,7 +639,7 @@ probe terms.
 
 ## Plaits position 0 architectural reference
 
-`filter-voice` and `src/dsp/ugen/va_filter.rs` are independent analytic Rust
+`filter-voice` and `music-things/crates/music-things-synth/src/va_filter.rs` are independent analytic Rust
 adaptations informed by the oscillator/filter roles and four control inputs
 in `plaits/dsp/engine2/virtual_analog_vcf_engine.{h,cc}` from
 `pichenettes/eurorack` revision
@@ -658,7 +660,7 @@ reproduced below under Peaks FM drum design reference.
 
 ## Plaits position 1 architectural reference
 
-`phase-pair-voice` and `src/dsp/ugen/phase_pair.rs` independently adapt the
+`phase-pair-voice` and `music-things/crates/music-things-synth/src/phase_pair.rs` independently adapt the
 control roles and synchronized main/free-running auxiliary architecture of
 `plaits/dsp/engine2/phase_distortion_engine.{h,cc}` from
 `pichenettes/eurorack` revision
@@ -678,7 +680,7 @@ by the shared opt-in `SourceStage` described below.
 
 ## Plaits positions 2–4 six-operator architectural reference
 
-`six-bank-{a,b,c}-voice` and `src/dsp/ugen/six_op_original.rs` use only the
+`six-bank-{a,b,c}-voice` and `music-things/crates/music-things-synth/src/six_op_original.rs` use only the
 control and output roles of the MIT-licensed
 `plaits/dsp/engine2/six_op_engine.{h,cc}` at Eurorack revision
 `08460a69a7e1f7a81c5a2abcc7189c9a6b7208d4` (copyright 2021 Emilie
@@ -698,7 +700,7 @@ below.
 
 ## Plaits position 15 speech architectural reference
 
-`speech-voice` and `src/dsp/ugen/speech_original.rs` independently adapt the
+`speech-voice` and `music-things/crates/music-things-synth/src/speech_original.rs` independently adapt the
 naive, SAM-like and LPC-like roles and main/formant versus auxiliary/excitation
 output relationship of MIT-licensed `plaits/dsp/engine/speech_engine.{h,cc}`
 and its `dsp/speech` dependencies at Eurorack revision
@@ -716,8 +718,8 @@ permission and warranty notice is reproduced below.
 
 ## Plaits voice-level layer (trigger, decay, low-pass gate, limiter)
 
-`src/dsp/ugen/voice_layer.rs` and the `vactrol-gate` and `decay-mod` nodes
-in `src/dsp/ugen/vactrol_gate.rs` are original fixed-state Rust informed by
+`music-things/crates/music-things-synth/src/voice_layer.rs` and the `vactrol-gate` and `decay-mod` nodes
+in `music-things/crates/music-things-synth/src/lpg.rs` are original fixed-state Rust informed by
 the voice-level stages of Mutable Instruments Plaits at Eurorack revision
 `08460a69a7e1f7a81c5a2abcc7189c9a6b7208d4`. The sources are
 `plaits/dsp/voice.{h,cc}` (trigger detection, decay and gate envelopes,
@@ -745,7 +747,7 @@ bit-exact source port.
 
 ## Plaits position 10 FM architectural reference
 
-`fm-pair-voice` and `src/dsp/ugen/fm_pair.rs` translate the
+`fm-pair-voice` and `music-things/crates/music-things-synth/src/fm_pair.rs` translate the
 carrier/modulator, signed-feedback, and carrier/sub output stages in
 `plaits/dsp/engine/fm_engine.{h,cc}` from `pichenettes/eurorack` revision
 `08460a69a7e1f7a81c5a2abcc7189c9a6b7208d4`. The engine and its sine
@@ -768,7 +770,7 @@ source-stage translation, not a bit-exact or complete Plaits port.
 
 ## Plaits position 12 additive MIT source-stage translation
 
-`spectrum-voice` and `src/dsp/ugen/spectrum_pair.rs` translate the
+`spectrum-voice` and `music-things/crates/music-things-synth/src/spectrum_pair.rs` translate the
 centroid/margin, cubic slope, bump gain, normalization and high-frequency
 taper stages of `plaits/dsp/engine/additive_engine.{h,cc}` in
 `pichenettes/eurorack` revision
@@ -799,7 +801,7 @@ conversions are recorded in the Plaits implementation plans.
 
 ## Plaits position 17 clocked-noise source-stage translation
 
-`clock-noise-voice` and `src/dsp/ugen/clock_noise_pair.rs` translate the two
+`clock-noise-voice` and `music-things/crates/music-things-synth/src/clock_noise_pair.rs` translate the two
 clocked-noise sources, quadratic BLEP edge correction, three state-variable
 filter paths, source control/gain roles and signed LP/BP/HP main sweep in
 `plaits/dsp/engine/noise_engine.{h,cc}` and
@@ -855,7 +857,7 @@ formant targets and deterministic per-voice noise; the dry auxiliary output
 and explicit digit selector are Vactr extensions. No source voice-content
 or numerical equivalence is claimed.
 
-The `fm-drum` kernel in `src/dsp/ugen/fm_drum.rs` translates the
+The `fm-drum` kernel in `music-things/crates/music-things-synth/src/fm_drum.rs` translates the
 single-phase sine, FM/auxiliary pitch and amplitude envelopes, previous-
 sample pitch feedback, noise mix and overdrive signal stages from
 `peaks/drums/fm_drum.h` and `peaks/drums/fm_drum.cc` from
@@ -935,7 +937,7 @@ parity and do not change the `Adaptation` manifest labels.
 
 ## Three-component percussion design reference
 
-The `fusion-drum` instrument and `src/dsp/ugen/fusion_drum.rs` were informed
+The `fusion-drum` instrument and `music-things/crates/music-things-synth/src/fusion_drum.rs` were informed
 by Christopher Arndt's `fbnfm_drumvoice.dsp`:
 https://gist.github.com/SpotlightKid/9e3b14d5cda5c763c9db7e5e24cfe352
 (last active 2024-11-19). The author declares the Faust source as MIT License.
@@ -1011,7 +1013,7 @@ The XMOD path imports the 24-coefficient symmetric halves of the pinned
 six-times/48-tap up and down FIRs from the individually MIT-noticed
 `sample_rate_conversion_filters.h` (copyright 2015 Emilie Gillet; its
 full permission and warranty notice is retained in
-`src/dsp/effects/cross_mod_src.rs`).
+`music-things/crates/music-things-fx/src/cross_mod_src.rs`).
 Vactr's streaming Rust converter uses fixed effect memory; these FIR
 coefficients are anti-aliasing filter data, not oscillator wavetables.
 The XMOD FIR runs at the host rate, while the vocoder bank runs internally
@@ -1141,7 +1143,7 @@ filter and freeze numerics are not reproduced.
 
 ## Rings Part architectural reference
 
-`resonator-voice` and `src/dsp/ugen/rings_part.rs` are original bounded
+`resonator-voice` and `music-things/crates/music-things-synth/src/rings_part.rs` are original bounded
 adaptations of the six model roles in Mutable Instruments
 `rings/dsp/part.{h,cc}`, `resonator`, `string`, and `fm_voice`, at Eurorack
 revision `08460a69a7e1f7a81c5a2abcc7189c9a6b7208d4`. Those source files
@@ -1252,7 +1254,7 @@ reproduced.
 ## music-synthesizer-for-android (msfa), Apache-2.0
 
 Repository: https://github.com/google/music-synthesizer-for-android
-Pinned revision: `f67d41d313b7dc85f6fb99e79e515cc9d208cfff` (matches the cross-reference in `src/dsp/ugen/fm/patch.rs`).
+Pinned revision: `f67d41d313b7dc85f6fb99e79e515cc9d208cfff` (matches the cross-reference in `music-things/crates/music-things-synth/src/fm/patch.rs`).
 
 Files consulted under `app/src/main/jni/`: `fm_core.cc` (algorithm bus flags); `dx7note.cc`, `dx7note.h`, `env.cc`, `env.h`, `synth.h`, `exp2.cc`, `exp2.h` (operator, envelope and scaling behavior); `fm_core.h`, `fm_op_kernel.cc`, `fm_op_kernel.h`, `freqlut.cc`, `freqlut.h`, `patch.cc`, `patch.h`, `pitchenv.cc`, and `pitchenv.h` (operator/frequency and patch layout).
 

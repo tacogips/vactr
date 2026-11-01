@@ -11,7 +11,7 @@
 
 use music_things_dsp::SampleView;
 
-use super::{Inp, KernelContext, NodeState, MAX_PORTS};
+use super::{Inp, KernelContext, KernelCtx, NodeState, MAX_PORTS};
 
 /// Decode exact frame words transported as exactly representable f32 integers.
 #[must_use]
@@ -58,6 +58,7 @@ pub fn play_view<C: KernelContext + ?Sized>(
     out: &mut [f32],
     kx: &C,
 ) {
+    let kx = &kx.kernel_ctx();
     play_worker_view(view, ins, st, out, None, kx);
 }
 /// Plays a sample view as mono and stereo channels.
@@ -70,18 +71,18 @@ pub fn play_stereo_view<C: KernelContext + ?Sized>(
     right: &mut [f32],
     kx: &C,
 ) {
+    let kx = &kx.kernel_ctx();
     play_worker_view(view, ins, st, mono, Some((left, right)), kx);
 }
 
-fn play_worker_view<C: KernelContext + ?Sized>(
+fn play_worker_view(
     view: Option<SampleView<'_>>,
     ins: &[Inp<'_>; MAX_PORTS],
     st: &mut NodeState,
     out: &mut [f32],
     mut stereo_out: Option<(&mut [f32], &mut [f32])>,
-    kx: &C,
+    kx: &KernelCtx,
 ) {
-    let kx = &kx.kernel_ctx();
     let Some(view) = view else {
         out.fill(0.0);
         if let Some((left, right)) = stereo_out.as_mut() {

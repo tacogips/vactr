@@ -4,8 +4,9 @@ This document covers moving vactr's synth and effect DSP kernels out of
 `src/dsp` into dependency-free, host-agnostic crates. The crates are staged at
 `music-things/crates/<crate>/` and vactr depends on them by path.
 
-Status: Proposed (2026-10-31, workflow run on branch `wf/music-things-extract`,
-baseline `origin/main` `a6e5bea`).
+Status: Implemented (2026-11-01, workflow session 605 on branch
+`wf/music-things-extract`; proposed 2026-10-31 against baseline `origin/main`
+`a6e5bea`). The plans are archived under `impl-plans/completed/music-things-*.md`.
 
 ## 1. Overview
 

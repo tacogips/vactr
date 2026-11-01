@@ -2,14 +2,16 @@
 
 ## music-things DSP extraction (2026-10-31)
 
-These plans implement [design-music-things-extraction.md](../design-docs/specs/design-music-things-extraction.md) on branch `wf/music-things-extract` (workflow session 577). They move vactr's synth and effect kernels into the in-tree crates `music-things/crates/music-things-{dsp,synth,fx}`, keeping audio bit-identical. All plans are Ready. Common rules are in [music-things-protocol.md](active/music-things-protocol.md), and waves are in the [dispatch manifest](active/music-things-dispatch.json).
+These plans implement [design-music-things-extraction.md](../design-docs/specs/design-music-things-extraction.md) on branch `wf/music-things-extract` (designed in session 577). They move vactr's synth and effect kernels into the in-tree crates `music-things/crates/music-things-{dsp,synth,fx}`, keeping audio bit-identical. All nine plans are Completed and archived (2026-11-01, workflow session 605) after test-integrity and adversarial review accepted them. MTX-00 was recorded as an accepted dependency in session 601. The combined-tree gates passed on the same tree (`tmp/music-things/MTX-91/` and `tmp/music-things/reconcile-605-wave5/`): workspace nextest 3113/3113 (3 skipped), baseline test names unmatched=0, workspace clippy `-D warnings`, host-wasm and per-crate wasm32 builds, editor vitest 2399 passed (1 protocol-filtered), the standalone virtual-workspace build and test (74 crate tests), the banned-token grep and the protected-path diff against `a6e5bea`. Common rules stay in [music-things-protocol.md](active/music-things-protocol.md). The [dispatch manifest](active/music-things-dispatch.json) stays in `active/` until the branch commit because the running workflow references it; its `planPath` fields still record the pre-archive `active/` locations.
 
-- **Wave 0**: [MTX-00 foundation](active/music-things-00-foundation.md)
-- **Wave 1** (parallel): [MTX-S1 classic, FM and MI roles](active/music-things-s1-classic-mi.md), [MTX-F1 dynamics to lo-fi groups](active/music-things-f1-dynamics-time.md)
-- **Wave 2** (parallel): [MTX-S2 pairs and LPG](active/music-things-s2-pairs-lpg.md), [MTX-F2 texture, granular, stream and analyzer](active/music-things-f2-texture-granular.md)
-- **Wave 3** (parallel): [MTX-S3 Braids and voice cores](active/music-things-s3-braids-voices.md), [MTX-F3 cross-mod and banks](active/music-things-f3-crossmod-banks.md)
-- **Wave 4**: [MTX-90 fx dispatch](active/music-things-90-fx-dispatch.md)
-- **Wave 5**: [MTX-91 notices and final drop-in gates](active/music-things-91-notices-final.md)
+- **Wave 0**: [MTX-00 foundation](completed/music-things-00-foundation.md)
+- **Wave 1** (parallel): [MTX-S1 classic, FM and MI roles](completed/music-things-s1-classic-mi.md), [MTX-F1 dynamics to lo-fi groups](completed/music-things-f1-dynamics-time.md)
+- **Wave 2** (parallel): [MTX-S2 pairs and LPG](completed/music-things-s2-pairs-lpg.md), [MTX-F2 texture, granular, stream and analyzer](completed/music-things-f2-texture-granular.md)
+- **Wave 3** (parallel): [MTX-S3 Braids and voice cores](completed/music-things-s3-braids-voices.md), [MTX-F3 cross-mod and banks](completed/music-things-f3-crossmod-banks.md)
+- **Wave 4**: [MTX-90 fx dispatch](completed/music-things-90-fx-dispatch.md)
+- **Wave 5**: [MTX-91 notices and final drop-in gates](completed/music-things-91-notices-final.md)
+
+Operator follow-up (out of scope for this run): copy `music-things/crates/*` and merge `music-things/THIRD_PARTY_NOTICES.md` into https://github.com/tacogips/music-things, then switch vactr to a pinned git dependency.
 
 ## Unapplied edit highlights (2026-10-23)
 

@@ -160,3 +160,137 @@ pub mod sample;
 
 /// Wavetable playback kernels.
 pub mod wavetable;
+
+/// Chiptune pair kernel.
+pub mod chip_pair;
+
+/// clock noise pair kernel.
+pub mod clock_noise_pair;
+
+/// grain pair kernel.
+pub mod grain_pair;
+
+/// modal pair kernel.
+pub mod modal_pair;
+
+/// particle pair kernel.
+pub mod particle_pair;
+
+/// spectrum pair kernel.
+pub mod spectrum_pair;
+
+/// string pair kernel.
+pub mod string_pair;
+
+/// swarm pair kernel.
+pub mod swarm_pair;
+
+/// six op original kernel.
+pub mod six_op_original;
+
+/// speech original kernel.
+pub mod speech_original;
+
+/// Number station kernel.
+pub mod number_station;
+
+/// Analog pair kernel.
+pub mod analog_pair;
+
+/// chord pair kernel.
+pub mod chord_pair;
+
+/// table terrain pair kernel.
+pub mod table_terrain_pair;
+
+/// terrain pair kernel.
+pub mod terrain_pair;
+
+/// string machine pair kernel.
+pub mod string_machine_pair;
+
+/// shape pair kernel.
+pub mod shape_pair;
+
+/// dual kick kernel.
+pub mod dual_kick;
+
+/// snare pair kernel.
+pub mod snare_pair;
+
+/// hat pair kernel.
+pub mod hat_pair;
+
+/// FM pair kernel.
+pub mod fm_pair;
+
+/// Low-pass gate kernel.
+pub mod lpg;
+/// Shared voice-layer primitives.
+pub mod voice_layer;
+
+/// braids cloud kernel.
+pub mod braids_cloud;
+
+/// braids digital kernel.
+pub mod braids_digital;
+
+/// braids filter kernel.
+pub mod braids_filter;
+
+/// braids five kernel.
+pub mod braids_five;
+
+/// braids fm kernel.
+pub mod braids_fm;
+
+/// braids formant kernel.
+pub mod braids_formant;
+
+/// braids noise kernel.
+pub mod braids_noise;
+
+/// braids percussion kernel.
+pub mod braids_percussion;
+
+/// braids physical kernel.
+pub mod braids_physical;
+
+/// braids struck kernel.
+pub mod braids_struck;
+
+/// braids subsync kernel.
+pub mod braids_subsync;
+
+/// braids triple kernel.
+pub mod braids_triple;
+
+/// braids wave bank kernel.
+pub mod braids_wave_bank;
+
+/// Braids wave line kernel.
+pub mod braids_wave_line;
+
+/// bass voice kernel.
+pub mod bass_voice;
+
+/// kalimba kernel.
+pub mod kalimba;
+
+/// tonewheel kernel.
+pub mod tonewheel;
+
+/// hurdy gurdy kernel.
+pub mod hurdy_gurdy;
+
+/// vosim kernel.
+pub mod vosim;
+
+/// gendyn kernel.
+pub mod gendyn;
+
+/// scanned kernel.
+pub mod scanned;
+
+/// Programmable digital drum kernels.
+pub mod digital_drum;

@@ -76,6 +76,7 @@ mod peak_function;
 mod peak_pulse;
 mod phase_pair;
 pub(crate) mod quad_mixer;
+mod quad_mixer_alloc;
 mod quad_outputs;
 mod ramp;
 mod rate_contract;

@@ -95,9 +95,11 @@ pub struct FxStats {
 }
 
 mod ctx;
+mod dispatch;
 mod kind;
 mod param_set;
 pub use ctx::{FxContext, FxCtx, GrainLimits};
+pub use dispatch::{init, mem_len, mix_index, params, process, requires_full_memory};
 pub use kind::{AnalyzerKind, EffectKind};
 pub use param_set::{ParamSet, MAX_PARAMS};
 
@@ -151,3 +153,48 @@ pub mod creative_reverb;
 
 /// Creative delay effects.
 pub mod creative_delay;
+
+/// texture processing.
+pub mod texture;
+
+/// texture quality processing.
+pub mod texture_quality;
+
+/// texture loop processing.
+pub mod texture_loop;
+
+/// texture stretch processing.
+pub mod texture_stretch;
+
+/// texture spectral processing.
+pub mod texture_spectral;
+
+/// dynamic control processing.
+pub mod dynamic_control;
+
+/// stream dynamics processing.
+pub mod stream_dynamics;
+
+/// stream cv processing.
+pub mod stream_cv;
+
+/// analyzer processing.
+pub mod analyzer;
+
+/// Granular processing.
+pub mod granular;
+
+/// cross mod effect processing.
+pub mod cross_mod;
+
+/// resonant bank effect processing.
+pub mod resonant_bank;
+
+/// elements bank effect processing.
+pub mod elements_bank;
+
+/// shift pair effect processing.
+pub mod shift_pair;
+
+/// quad mixer effect processing.
+pub mod quad_mixer;

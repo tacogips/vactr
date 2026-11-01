@@ -4,7 +4,7 @@ import type { ResolvedBlockWidget, ResolvedEolWidget } from '../plugin/widgets';
 import type { WidgetContent } from '../types';
 
 type Widget = ResolvedBlockWidget | ResolvedEolWidget;
-interface Mounted { spec: Widget; wrapper: HTMLDivElement; content: WidgetContent; cleanup?: () => void; canvas?: HTMLCanvasElement; ctx?: CanvasRenderingContext2D; reservation?: Reservation; width: number; height: number; dpr: number; animate: boolean; dirty: boolean; transform: string }
+interface Mounted { spec: Widget; wrapper: HTMLDivElement; content: WidgetContent; cleanup?: () => void; canvas?: HTMLCanvasElement; ctx?: CanvasRenderingContext2D; reservation?: Reservation; width: number; height: number; dpr: number; animate: boolean; dirty: boolean; transform: string; painted?: unknown }
 export class WidgetLayer {
   private container: HTMLDivElement;
   private mounted = new Map<string, Mounted>();
@@ -52,7 +52,10 @@ export class WidgetLayer {
       else { item.wrapper.setAttribute('aria-hidden', 'true'); item.wrapper.removeAttribute('role'); item.wrapper.removeAttribute('aria-label'); }
       const transform = `translate(${eol ? `calc(${x}px + 1ch)` : `${x}px`}, ${top - scroll}px)`; if (item.transform !== transform) { item.wrapper.style.transform = transform; item.transform = transform; }
       if (visible && item.ctx && widget.content.kind === 'canvas' && (item.animate || item.dirty)) {
-        item.ctx.clearRect(0, 0, w, h); item.animate = widget.content.draw(item.ctx, { width: w, height: h, dpr, frameMs }); item.dirty = false;
+        const version = widget.content.version?.();
+        if (item.dirty || !widget.content.version || !Object.is(version, item.painted)) {
+          item.ctx.clearRect(0, 0, w, h); item.animate = widget.content.draw(item.ctx, { width: w, height: h, dpr, frameMs }); item.dirty = false; item.painted = version;
+        }
       }
       if (visible && item.canvas && item.animate) animating = true;
     };

@@ -1,6 +1,6 @@
 # EMK-VAC-PLUGINS: beat glow and eval flash as marks, inline sequencer and oscilloscope widgets, show/hide toggle
 
-**Status**: Implemented; awaiting review
+**Status**: Completed (accepted in session 620 wave 1; post-closeout operator optimization of widget republish/repaint recorded in emaki-60-closeout.md)
 **Plan ID**: EMK-VAC-PLUGINS (wave 4; parallel with EMK-DIFF-DEMO, EMK-JSON-DEMO, EMK-SHOWCASE)
 **Design Reference**: `design-docs/specs/design-emaki.md` sections 13.2-13.7; decisions EM-D10, EM-D13, EM-D16; user-QA defaults EQ2, EQ4, EQ5
 **Rules**: `impl-plans/active/emaki-00-rules.md`
@@ -404,4 +404,8 @@ The session-618 block was a race: EMK-PERF was mutating
 ran the full suite. EMK-PERF is now Completed, the file is byte-identical to
 HEAD, and nothing else runs in this wave. Rerun the full editor vitest on the
 stable tree and complete.
+
+### Session: 2026-11-01 (session 620 stable-tree verification)
+**Tasks Completed**: Confirmed the implementation against the assigned plan and design; no source changes were needed. Formal review and finalization remain downstream.
+**Verification**: Editor check passed; scoped vitest passed 148/148; full editor vitest passed 2370/2370 under the measurement lock. Logs: `check-step6-620.log`, `scoped-step6-620.log`, `full-step6-620.log`. Browser gates retain the operator's rule-13 baseline disposition above, not a clean pass. Pre-edit intent and hashes are in `intent-step6-620.txt` and `plan-step6-620.sha256`.
 

@@ -1,6 +1,6 @@
 # EMK-CLOSEOUT: full gates G1-G10, packaging absent-case proof, docs, mise tasks and index
 
-**Status**: Ready (after all other emaki plans)
+**Status**: Ready (C1 run by the operator; C2 pending)
 **Plan ID**: EMK-CLOSEOUT (wave 6; runs alone)
 **Design Reference**: `design-docs/specs/design-emaki.md` sections 11.3 (proof), 15 (G1-G10), 16 (W5); decisions EM-D3, EM-D14, EM-D15
 **Rules**: `impl-plans/active/emaki-00-rules.md`
@@ -195,3 +195,38 @@ Run serially, each under the lock where heavy. Logs go to
 **Tasks Completed**: Missing wave-5 non-browser join passed serially under the measurement lock (emaki check, 138/138 tests, build, editor check; `tmp/emaki/wave-5-join/summary.json`). G1 passed (`tmp/emaki/EMK-CLOSEOUT/g1.log`, exit 0).
 **Blocked**: G2 clean install was rejected by automatic command approval because the required command removes `emaki/node_modules` and `emaki/dist`; it did not execute. Resume with the authorized clean-install gate in an environment that permits the specified removal, then continue C1 serially. C2 remains pending C1. No product files changed.
 **Evidence**: `tmp/emaki/EMK-CLOSEOUT/intent-g2-block.txt`, `plan-before-g2-block.txt`, and `plan-before-g2-block.sha256`; post-edit hash in `plan-after-g2-block.sha256`. Existing sibling changes were preserved.
+
+### Session: 2026-11-01 (session 621 continuation)
+**Tasks Completed**: G1 passed on the current tree (`tmp/emaki/EMK-CLOSEOUT/g1-session621.log`, exit 0).
+**Blocked**: Automatic command approval rejected the required G2 clean-install command before execution because it removes generated directories. No G2 log or result was produced. Resume G2 in an environment that permits its prescribed cleanup, then continue C1 serially; C2 remains pending C1.
+**Evidence**: `tmp/emaki/EMK-CLOSEOUT/intent-session621.txt` and `plan-before-session621.txt`. The sibling plan change was preserved.
+
+## Operator note (after session 620): C1 gates run by the operator
+
+The sandbox refused the destructive G2/G5 commands and cannot launch
+browsers, so the operator ran every C1 gate serially under the lock on the
+combined tree. Evidence: `tmp/emaki/EMK-CLOSEOUT/operator/summary.json`
+(records in rule-10 shape, logs next to it). Results:
+- G1, G2 (clean install, check, 138 tests, build), G5 absent and present
+  cases (install-state in `G5-install-state.txt`), G6 (2370/2370), G7 builds,
+  G8 e2e:examples 8/8, G3 emaki perf allPass, G4 emaki e2e and showcase smoke,
+  G10 Tauri 17/17 (no Rust/Tauri diff), boundary checks: all exit 0.
+- G7 test:style and G8 behavior e2e: only the rule-13 pre-existing failures
+  (identical to baseline a6e5bea).
+- G9: the B11 thresholds pass in both browsers. The run exposed a real
+  regression (Chromium highlight sync p99 71-89 ms) from the inline widgets
+  republishing and repainting every frame. The operator fixed it: emaki
+  canvas widget content gains an optional `version()` (repaint only when it
+  changes; `emaki/src/types.ts`, `emaki/src/view/widget-layer.ts`, test in
+  `emaki/test/view/widget-layer.test.ts`), and the vactr sequencer/scope
+  plugins republish only when anchors change and version their paint
+  (`editor/src/code/inline/sequencer.ts`, `scope.ts`). Re-measured sync p99 is
+  at or better than baseline; editor vitest 2370/2370 and emaki 139/139 after
+  the fix.
+
+C1 is therefore complete. Do not rerun the destructive or browser gates;
+you may rerun cheap non-destructive checks. Do C2 now: docs (design Status
+and section 19 built from the operator summary, including the G9 tables and
+the version() API addition), mise tasks, the impl-plans index and README
+updates, then complete.
+

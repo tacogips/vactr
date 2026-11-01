@@ -23,7 +23,12 @@ export interface LineFormat { pos: number; style: LineFormatStyle }
 export interface ResolvedLineFormat { line: number; style: LineFormatStyle }
 export interface TokenSpan extends Range { tag: string }
 export interface LineToken { from: number; to: number; tag: string }
-export type WidgetContent = { kind: 'dom'; mount(el: HTMLElement): () => void } | { kind: 'canvas'; draw(ctx: CanvasRenderingContext2D, info: { width: number; height: number; dpr: number; frameMs: number }): boolean };
+/**
+ * Canvas content is redrawn while `draw` returns true. When `version` is given, an animating widget is
+ * repainted only when the returned value changes (compared with `Object.is`), so content that changes at
+ * a lower rate than the display (step grids, telemetry frames) does not repaint every frame.
+ */
+export type WidgetContent = { kind: 'dom'; mount(el: HTMLElement): () => void } | { kind: 'canvas'; draw(ctx: CanvasRenderingContext2D, info: { width: number; height: number; dpr: number; frameMs: number }): boolean; version?(): unknown };
 export interface BlockWidgetSpec { key: string; pos: number; side: 'above' | 'below'; height: number; content: WidgetContent; interactive?: boolean; label?: string }
 export interface EolWidgetSpec { key: string; pos: number; width: number; content: WidgetContent; interactive?: boolean; label?: string }
 export interface LineLanguage<S> { kind: 'lines'; name: string; startState(): S; tokenizeLine(text: string, state: S): { tokens: readonly LineToken[]; state: S }; sameState(a: S, b: S): boolean }

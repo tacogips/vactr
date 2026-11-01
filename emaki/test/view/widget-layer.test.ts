@@ -20,4 +20,17 @@ describe('WidgetLayer', () => {
     blocks[1] = { ...blocks[1], content: { kind: 'canvas', draw } }; update(100000); expect(draw).toHaveBeenCalledTimes(2);
     layer.dispose(); expect(ledger.usedBytes).toBe(0); getContext.mockRestore();
   });
+  it('repaints an animating canvas only when its version changes', () => {
+    const ctx = { scale: vi.fn(), clearRect: vi.fn() } as unknown as CanvasRenderingContext2D;
+    const getContext = vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(ctx);
+    const layout = new TextLayout({ font: '', measureText: s => ({ width: s.length * 8 }) }, { font: '16px mono', lineHeight: 20, baseline: 15 });
+    layout.setDocument('a\nb\nc'); const host = document.createElement('div'); const layer = new WidgetLayer(host, layout, new ResourceLedger());
+    let version = 0; const draw = vi.fn(() => true);
+    const blocks: ResolvedBlockWidget[] = [{ id: 'v', key: 'v', pos: 0, line: 0, side: 'below', height: 10, content: { kind: 'canvas', draw, version: () => version } }];
+    const update = () => layer.update({ view: { width: 300, height: 200, scrollTop: 0, scrollLeft: 0 }, dpr: 1, frameMs: 0, blocks, eols: [] });
+    expect(update().animating).toBe(true); expect(draw).toHaveBeenCalledOnce();
+    update(); update(); expect(draw).toHaveBeenCalledOnce();
+    version = 1; update(); expect(draw).toHaveBeenCalledTimes(2); update(); expect(draw).toHaveBeenCalledTimes(2);
+    layer.dispose(); getContext.mockRestore();
+  });
 });

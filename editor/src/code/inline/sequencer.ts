@@ -14,10 +14,23 @@ export function createSequencerPlugin(deps: SequencerDeps): { plugin: EmakiPlugi
   let host: PluginHost | undefined;
   let published = false;
   let colors: { accent: string; muted: string; raised: string } | undefined;
+  let stepsRevision = 0; let publishedKey = ''; let resumeNeeded = true;
+  // Which steps are lit (plus the step data revision): the widget repaints only when this changes.
+  const litVersion = (slots: readonly string[]): string => {
+    const now = deps.cycles(); const phase = now === null ? -1 : now - Math.floor(now);
+    let lit = `${stepsRevision}:`;
+    for (const slot of slots) for (const [i, step] of steps.steps(slot).entries()) if (phase >= step.pos && phase < step.pos + step.len) lit += `${slot}/${i},`;
+    return lit;
+  };
   const refresh = (): void => {
     if (!host) return;
-    if (!deps.enabled()) { if (published) host.widgets('seq').clear(); published = false; return; }
+    if (!deps.enabled()) { if (published) host.widgets('seq').clear(); published = false; publishedKey = ''; return; }
     const anchors = slotAnchors({ firstSrc, mapSpan: deps.mapSpan, forms: deps.forms(), doc: host.state.doc });
+    // Republish only when the anchors change, or to restart drawing after the transport stopped;
+    // the draw callbacks read live step data, so other batches need only a frame.
+    const key = [...anchors].map(([line, slots]) => `${line}:${slots.join(',')}`).join(';');
+    if (published && key === publishedKey && !resumeNeeded) return;
+    publishedKey = key; resumeNeeded = false;
     const blocks: BlockWidgetSpec[] = [...anchors].map(([line, slots]) => ({
       key: `seq:${line}`, pos: host!.state.doc.line(line + 1).from, side: 'below', height: slots.length * 14 + 6,
       content: { kind: 'canvas', draw(ctx, { width, height }) {
@@ -31,17 +44,18 @@ export function createSequencerPlugin(deps: SequencerDeps): { plugin: EmakiPlugi
           ctx.fillStyle = phase >= step.pos && phase < step.pos + step.len ? colors!.accent : colors!.muted;
           ctx.fillRect(step.pos * width, row * 14 + 3, Math.max(2, step.len * width - 1), 10);
         } });
+        if (!deps.running()) resumeNeeded = true;
         return deps.running();
-      } },
+      }, version: () => litVersion(slots) },
     }));
     if (blocks.length) { host.widgets('seq').set(blocks); published = true; }
-    else if (published) { host.widgets('seq').clear(); published = false; }
+    else { if (published) host.widgets('seq').clear(); published = false; publishedKey = ''; }
   };
   return {
     plugin: { name: 'inline-sequencer', attach(h) { host = h; refresh(); return { destroy() { host = undefined; } }; } },
     onPlaying(events) {
       const bpc = deps.beatsPerCycle() > 0 ? deps.beatsPerCycle() : 4;
-      steps.add(events, bpc);
+      steps.add(events, bpc); stepsRevision++;
       for (const event of events) {
         const beat = event.beat[1] === 0 ? 0 : event.beat[0] / event.beat[1];
         const cycle = Math.floor(beat / bpc); const old = cycles.get(event.slot);
@@ -51,6 +65,6 @@ export function createSequencerPlugin(deps: SequencerDeps): { plugin: EmakiPlugi
       }
       refresh(); host?.requestFrame();
     },
-    clear() { steps.clear(); cycles.clear(); firstSrc.clear(); refresh(); }, refresh,
+    clear() { steps.clear(); cycles.clear(); firstSrc.clear(); stepsRevision++; resumeNeeded = true; refresh(); }, refresh,
   };
 }

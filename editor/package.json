@@ -29,7 +29,7 @@
     "@tauri-apps/api": "2.11.1",
     "@tauri-apps/plugin-dialog": "2.7.3",
     "@tauri-apps/plugin-fs": "2.5.2",
-    "emaki": "github:tacogips/emaki#1de212ff9dbb29ddf90fd8cf7a6b15a9bae5b7c6",
+    "emaki": "github:tacogips/emaki#6138022719bcb161af7faf7ba23474789ed9b1b6",
     "solid-js": "1.9.15",
     "web-tree-sitter": "0.27.0"
   },

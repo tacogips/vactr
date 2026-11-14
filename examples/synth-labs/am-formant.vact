@@ -1,0 +1,14 @@
+# Original MusicDSP-inspired am-formant synthesis, sample-free.
+# Run: target/debug/vactr run examples/synth-labs/am-formant.vact --host native --cycles 16
+# Lorenz/Rossler are chaotic textures; note values do not imply tuned pitch.
+
+inst lab-am-formant formant-one: float = 700 second: float = 1400:
+	am-formant-osc freq formant-1: formant-one formant-2: second bandwidth-1: 120 bandwidth-2: 190 balance: 0.5
+		> * {env-perc 0.01 0.45} > * amp
+
+use-bpm 120
+
+master:
+	limiter ceiling: -2 release: 0.08
+
+s :lab-am-formant > note [:g2 nil :d3 :ab2] > formant-one {range sine 450 1000} > second {range sine 1100 2400} > gain 0.25 > d1

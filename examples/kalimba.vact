@@ -1,0 +1,5 @@
+# A bright tine melody with beating pairs, a subtle bottle-cap buzz, and a hardness contrast.
+use-bpm 108
+
+s :kalimba > note [:c5 :e5 :g5 :c6] > kalimba-beat 0.8 > kalimba-hardness 0.35 > kalimba-decay 2.2 > kalimba-buzz 0 > gain 0.28 > d1
+s :kalimba > note [:g5 :e5 :d5 :c5] > kalimba-beat 2.4 > kalimba-hardness 0.78 > kalimba-decay 1.6 > kalimba-buzz 0.4 > gain 0.22 > d2

@@ -1,0 +1,151 @@
+==================
+pairs and operators
+==================
+slot :drums gain: 0.8:
+	let x 1
+x = a->b
+- x
+>= x
+---
+
+(source_file
+  (statement
+    (identifier)
+    (keyword)
+    (pair
+      (identifier)
+      (number))
+    (block_colon)
+    (block
+      (statement
+        (identifier)
+        (identifier)
+        (number))))
+  (statement
+    (identifier)
+    (operator)
+    (identifier)
+    (operator)
+    (identifier))
+  (statement
+    (operator)
+    (identifier))
+  (statement
+    (operator)
+    (identifier)))
+
+==================
+deep continuation with block
+==================
+play voice
+		> filter:
+			cutoff 900
+---
+
+(source_file
+  (statement
+    (identifier)
+    (identifier)
+    (continuation
+      (identifier))
+    (block_colon)
+    (block
+      (statement
+        (identifier)
+        (number)))))
+
+==================
+inst nested block
+==================
+inst voice:
+	bus out:
+		let gain 0.8
+---
+
+(source_file
+  (statement
+    (identifier)
+    (identifier)
+    (block_colon)
+    (block
+      (statement
+        (identifier)
+        (identifier)
+        (block_colon)
+        (block
+          (statement
+            (identifier)
+            (identifier)
+            (number)))))))
+
+==================
+if elif else
+==================
+if ready:
+	play a
+elif waiting:
+	play b
+else:
+	stop
+---
+
+(source_file
+  (statement
+    (identifier)
+    (identifier)
+    (block_colon)
+    (block
+      (statement
+        (identifier)
+        (identifier))))
+  (statement
+    (identifier)
+    (identifier)
+    (block_colon)
+    (block
+      (statement
+        (identifier)
+        (identifier))))
+  (statement
+    (identifier)
+    (block_colon)
+    (block
+      (statement
+        (identifier)))))
+
+==================
+lambda block
+==================
+fn map ->:
+	let x 1
+---
+
+(source_file
+  (statement
+    (identifier)
+    (identifier)
+    (operator)
+    (block_colon)
+    (block
+      (statement
+        (identifier)
+        (identifier)
+        (number)))))
+
+==================
+keyword block
+==================
+call :kw:
+	let x 1
+---
+
+(source_file
+  (statement
+    (identifier)
+    (keyword)
+    (block_colon)
+    (block
+      (statement
+        (identifier)
+        (identifier)
+        (number)))))

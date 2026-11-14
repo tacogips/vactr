@@ -1,0 +1,63 @@
+{
+  "name": "chromium",
+  "checks": [
+    {
+      "id": "dom-visible-text",
+      "pass": true,
+      "detail": "visible rows=3; keyword=rgb(163, 190, 140); bridge opacity=0"
+    },
+    {
+      "id": "dom-caret-alignment",
+      "pass": true,
+      "detail": "caret deltas=0.015625,0,0.015625px"
+    },
+    {
+      "id": "editing-undo-redo-navigation",
+      "pass": true,
+      "detail": "undo=9; redo=10; home=0; word=3; end=62"
+    },
+    {
+      "id": "clipboard-round-trip",
+      "pass": true,
+      "detail": "dom-clipboard-evidence"
+    },
+    {
+      "id": "japanese-ime",
+      "pass": true,
+      "detail": "one commit revision=11; Japanese preedit visible"
+    },
+    {
+      "id": "touch-selection",
+      "pass": true,
+      "detail": "{\"selection\":{\"anchor\":0,\"head\":10},\"handles\":2,\"domHandles\":2}"
+    },
+    {
+      "id": "dpr-and-resize",
+      "pass": true,
+      "detail": "{\"selection\":{\"anchor\":0,\"head\":10},\"builds\":21,\"actual\":2,\"effective\":2}"
+    },
+    {
+      "id": "visual-viewport-inset",
+      "pass": true,
+      "detail": "bridge bottom=67; inset height=360"
+    },
+    {
+      "id": "background-no-replay",
+      "pass": true,
+      "detail": "frames hidden=73, resumed=83"
+    },
+    {
+      "id": "dom-bounded-nodes",
+      "pass": true,
+      "detail": "{\"middle\":{\"liveLines\":71,\"rows\":50,\"margin\":25,\"from\":19929,\"to\":20000},\"end\":{\"liveLines\":71,\"rows\":50,\"margin\":25,\"from\":19929,\"to\":20000}}"
+    },
+    {
+      "id": "dispose-ledger",
+      "pass": true,
+      "detail": "usedBytes=0; DOM surface removed"
+    }
+  ],
+  "passed": 11,
+  "total": 11,
+  "limitations": []
+}

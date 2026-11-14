@@ -1,0 +1,21 @@
+# Lo-fi bus demo: alternating four-bar clean and degraded statements.
+# Play: target/debug/vactr run examples/lofi-lab.vact --host native --cycles 16
+inst lofi-demo-keys:
+	fm-op freq ratio: 1 index: {env-perc 0.002 1.1}
+		> fm-mod {fm-op freq ratio: 2 index: 0.2}
+		> * {env-perc 0.006 0.9} > * amp
+
+use-bpm 84
+
+bus :clean:
+	gain 0
+
+bus :aged:
+	lofi tone: 4200 drive: 1.8 wow: 0.2 flutter: 0.04 bits: 12 rate: 22050 hiss: 0.18 crackle: 0.16 mix: 1
+
+master:
+	gain 6 > limiter ceiling: -2 release: 0.08
+
+let theme [:e5 :g5 nil :b4 :d5 nil :a4 nil]
+s :lofi-demo-keys > note theme > gain {slow [0.22 0] 8} > bus :clean > d1
+s :lofi-demo-keys > note theme > gain {slow [0 0.22] 8} > bus :aged > d2

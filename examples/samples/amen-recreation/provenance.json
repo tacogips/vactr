@@ -1,0 +1,14 @@
+{
+  "source": "https://sampleloom.com/sample/jungle-amen-break-slice-165bpm-4-bars-262cb3",
+  "download": "https://sampleloom.com/static/catalog/jungle-amen-break-slice-165bpm-4-bars-262cb3.wav",
+  "license": "CC0-1.0 (as stated by source)",
+  "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "retrieved": "2026-09-30",
+  "description": "Synthetic Amen-pattern recreation, not the original Winstons recording",
+  "upstream_sha256": "53a3509660c720a6be304c761db07bdb76b0e7bcec7145c8c8df85245e3e927e",
+  "source_bpm": 165,
+  "sample_rate": 44100,
+  "source_frames": 256581,
+  "source_peak": 0.7099999785423279,
+  "arrangement_method": "Only source.wav is sampled; region windows, chop/slice/splice/rearrangement and reverse playback are expressed in Vact."
+}

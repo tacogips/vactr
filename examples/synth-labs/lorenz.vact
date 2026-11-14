@@ -1,0 +1,14 @@
+# Original MusicDSP-inspired lorenz synthesis, sample-free.
+# Run: target/debug/vactr run examples/synth-labs/lorenz.vact --host native --cycles 16
+# Lorenz/Rossler are chaotic textures; note values do not imply tuned pitch.
+
+inst lab-lorenz rate: float = 12 chaos: float = 0.5:
+	lorenz-osc rate chaos: chaos output-axis: 0 > hpf 30
+		> * {env-perc 0.01 0.45} > * amp
+
+use-bpm 120
+
+master:
+	limiter ceiling: -2 release: 0.08
+
+s :lab-lorenz > note [:g2 nil :d3 :ab2] > rate {range sine 8 22} > chaos {range sine 0.3 0.85} > gain 0.25 > d1

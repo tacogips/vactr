@@ -1,0 +1,114 @@
+import type { Client } from '../protocol/client';
+import type { Store } from '../protocol/store';
+import type { Provenance } from '../app/clock';
+import type { CodeSurface } from './surface';
+import type { HighlightScheduler } from './highlight';
+import type { CanvasRenderer as CodeRenderer } from './renderer';
+import type { ResourceLedger } from 'emaki/engine';
+import { PERF_PHASES, type PerfPhase, type PerfRecorder } from 'emaki/engine';
+import type { TransportSample } from '../protocol/types';
+
+export interface PresentedRecord {
+  frameMs: number; targetMs: number; audibleTime: number; provenance: Provenance; valid: boolean;
+  activeKey: string; beatCycle: number | null; beatFlash: boolean; revision: number; handles: number;
+  executionMs?: number; epoch?: string | null;
+}
+export interface OnsetRecord { time: number; end: number; from: number; to: number; epoch: string | null; receivedMs: number; id?: number }
+export interface VactrPerf {
+  perf: PerfRecorder;
+  phases(): { names: PerfPhase[]; rows: number[][] };
+  revision(): number;
+  ledger: ResourceLedger;
+  doc(): string;
+  selection(): { anchor: number; head: number };
+  annotations(): { kind: string; from: number; to: number }[];
+  presented(): PresentedRecord[];
+  onsets(): OnsetRecord[];
+  transportSample(): TransportSample | null;
+  transportOutput(): string;
+  outputHistory(): string[];
+  momentaryLabels(): string[];
+  momentaryHit(pos: number): boolean;
+  coordsAtPos(pos: number): { left: number; right: number; top: number; bottom: number } | null;
+  counters(): { highlight: HighlightScheduler['stats']; probe: null; client: Client['queueStats']; syntaxTruncated: number;
+    textPending: boolean; renderer: CodeRenderer['stats']; domNodes: number;
+    gpuStatus: { kind: string; effectiveDpr: number }; layout: CodeRenderer['layout']['stats'];
+    ledger: ResourceLedger['counters']; usedBytes: number };
+  disposeCode(): void;
+}
+
+interface PerfInputs {
+  win: Window; perf: PerfRecorder; surface: CodeSurface; revision(): number; ledger: ResourceLedger;
+  highlight: HighlightScheduler; renderer: CodeRenderer; client: Client; store: Store;
+  transportOutput(): string; outputHistory(): readonly string[]; momentaryLabels(): readonly string[];
+  syntaxTruncated(): number; disposeCode(): void;
+}
+
+export function installPerfHook(input: PerfInputs): VactrPerf {
+  const presentedRows: PresentedRecord[] = new Array(4096);
+  const onsetRows: OnsetRecord[] = new Array(4096);
+  let presentedNext = 0, presentedCount = 0, onsetNext = 0, onsetCount = 0;
+  const ordered = <T>(rows: T[], next: number, count: number): T[] => {
+    const out: T[] = []; const start = (next - count + rows.length) % rows.length;
+    for (let i = 0; i < count; i++) { const value = rows[(start + i) % rows.length]; if (value !== undefined) out.push(value); }
+    return out;
+  };
+  const api: VactrPerf = {
+    perf: input.perf, phases: () => ({ names: [...PERF_PHASES], rows: input.perf.phases.rows() }),
+    revision: input.revision, ledger: input.ledger,
+    doc: () => input.surface.state.doc.toString(),
+    selection: () => ({ anchor: input.surface.state.selection.main.anchor, head: input.surface.state.selection.main.head }),
+    annotations: () => input.surface.annotationRanges().map(({ kind, from, to }) => ({ kind, from, to })),
+    presented: () => ordered(presentedRows, presentedNext, presentedCount),
+    onsets: () => ordered(onsetRows, onsetNext, onsetCount),
+    transportSample: () => input.store.transportSample ?? null,
+    transportOutput: input.transportOutput,
+    outputHistory: () => [...input.outputHistory()],
+    momentaryLabels: () => [...input.momentaryLabels()],
+    momentaryHit: (pos) => input.surface.momentaryHit(pos),
+    coordsAtPos: (pos) => {
+      const rect = input.surface.coordsAtPos(pos);
+      return rect ? { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom } : null;
+    },
+    counters: () => ({ highlight: input.highlight.stats, probe: null, client: input.client.queueStats,
+      syntaxTruncated: input.syntaxTruncated(), textPending: input.renderer.textPending, renderer: input.renderer.stats,
+      domNodes: input.win.document.getElementsByTagName('*').length,
+      gpuStatus: { kind: input.renderer.status.kind, effectiveDpr: input.renderer.status.effectiveDpr },
+      layout: input.renderer.layout.stats, ledger: input.ledger.counters, usedBytes: input.ledger.usedBytes }),
+    disposeCode: input.disposeCode,
+  };
+  Object.defineProperty(api, 'recordPresented', { value: (record: PresentedRecord) => {
+    presentedRows[presentedNext] = record; presentedNext = (presentedNext + 1) % presentedRows.length;
+    presentedCount = Math.min(presentedRows.length, presentedCount + 1);
+  } });
+  Object.defineProperty(api, 'recordOnset', { value: (record: OnsetRecord) => {
+    onsetRows[onsetNext] = record; onsetNext = (onsetNext + 1) % onsetRows.length;
+    onsetCount = Math.min(onsetRows.length, onsetCount + 1);
+  } });
+  Object.defineProperty(api, 'retractOnset', { value: (id: number) => {
+    const keep = ordered(onsetRows, onsetNext, onsetCount).filter((record) => record.id !== id);
+    onsetNext = 0; onsetCount = 0;
+    for (const record of keep) {
+      onsetRows[onsetNext] = record;
+      onsetNext = (onsetNext + 1) % onsetRows.length;
+      onsetCount += 1;
+    }
+  } });
+  (input.win as Window & { __vactrPerf?: VactrPerf }).__vactrPerf = api;
+  return api;
+}
+
+export function recordPresented(api: VactrPerf | null, record: PresentedRecord): void {
+  (api as (VactrPerf & { recordPresented?: (value: PresentedRecord) => void }) | null)?.recordPresented?.({
+    ...record,
+    executionMs: performance.now(),
+  });
+}
+export function recordOnset(api: VactrPerf | null, record: OnsetRecord): void {
+  (api as (VactrPerf & { recordOnset?: (value: OnsetRecord) => void }) | null)?.recordOnset?.(record);
+}
+export function retractOnset(api: VactrPerf | null, id: number): void {
+  const onsetApi = api as (VactrPerf & { retractOnset?: (value: number) => void }) | null;
+  onsetApi?.retractOnset?.(id);
+}
+export function removePerfHook(win: Window): void { delete (win as Window & { __vactrPerf?: VactrPerf }).__vactrPerf; }

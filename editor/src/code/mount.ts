@@ -1,0 +1,490 @@
+// Canvas code pane composition (design 15.1.5, 15.3.8.2-15.3.8.3).
+// The headless CodeSurface owns the document; DOM owns input and accessibility only.
+
+import { Text } from '@codemirror/state';
+import { createComponent, createSignal } from 'solid-js';
+import { render } from 'solid-js/web';
+import type { CodeApi, CodeAnnotation, SampleLibraryApi } from '../app/apis';
+import type { ServerEnvelope } from '../protocol/types';
+import type { EditorDeps, Mounted } from '../app/deps';
+import { pane } from '../app/layout';
+import { FrameScheduler, DecorationStore, WidgetSet, WidgetLayer, PluginRuntime, type FrameHost } from 'emaki/engine';
+import { createBeatGlowPlugin } from './beat-glow';
+import { createSequencerPlugin } from './inline/sequencer';
+import { createScopePlugin } from './inline/scope';
+import { readInlineWidgets, writeInlineWidgets } from './inline-settings';
+import { DiagnosticsController } from './diagnostics';
+import { EvalController } from './eval';
+import { HighlightScheduler, TimeAnchor } from './highlight';
+import { FallbackSpans, SyntaxSpans, WorkerSyntaxSpans, type SpanProvider } from './syntax';
+import { formatKeymap } from './format';
+import { createVactLanguage } from './vact-language';
+import { SampleBrowser, SampleLibrary, type DecodedAudio } from './samples';
+import { DocumentSync } from './sync';
+import { TransportBar } from './transport';
+import { CodeSurface } from './code-view';
+import { attachCompletion } from './completion-view';
+import { CodeSurface as HeadlessSurface } from './surface';
+import { InputController } from './input';
+import { PointerController, type SelectionHandle } from 'emaki/engine';
+import { MomentaryPointer } from './momentary-pointer';
+import { TextLayout } from 'emaki/engine';
+import { createMeasureContext } from 'emaki/engine';
+import { CanvasRenderer } from './renderer';
+import type { CanvasRenderer as CodeRenderer } from './renderer';
+import { readPalette } from './theme';
+import { ResourceLedger } from 'emaki/engine';
+import { ViewHost as CodeViewHost } from 'emaki/engine';
+import { installPerfHook, recordOnset, recordPresented, retractOnset, removePerfHook, type VactrPerf } from './perf-hook';
+import { createVimMode } from './vim-mount';
+import { UnappliedEdits } from './unapplied';
+import { readUnappliedColor, saveUnappliedColor, validUnappliedColor } from './unapplied-settings';
+
+export const DOC_FILE = 'main.vact';
+
+function sameAnnotations(left: readonly CodeAnnotation[], right: readonly CodeAnnotation[]): boolean {
+  return left.length === right.length && left.every((row, index) => {
+    const other = right[index];
+    return other !== undefined && row.from === other.from && row.to === other.to && row.kind === other.kind &&
+      row.className === other.className && row.label === other.label;
+  });
+}
+
+export interface MountOptions {
+  gl?: WebGL2RenderingContext;
+  frameHost?: FrameHost;
+  createCanvas?: () => HTMLCanvasElement;
+}
+
+function localStore(win: Window | null): Pick<Storage, 'getItem' | 'setItem'> | null {
+  try { return win?.localStorage ?? null; } catch { return null; }
+}
+const STYLESHEET = new URL('./code.css', import.meta.url).href;
+function addStylesheet(doc: Document): void {
+  if (doc.querySelector('link[data-vact-code-css]')) return;
+  const link = doc.createElement('link'); link.rel = 'stylesheet'; link.href = STYLESHEET; link.dataset.vactCodeCss = '';
+  doc.head.appendChild(link);
+}
+function frameHost(win: Window, override?: FrameHost): FrameHost {
+  return override ?? (win as unknown as FrameHost);
+}
+
+export function mount(root: HTMLElement, deps: EditorDeps, opts: MountOptions = {}): Mounted {
+  const { client, store, clock, tier } = deps;
+  const doc = root.ownerDocument; const win = doc.defaultView;
+  if (!win) throw new Error('Canvas editor requires a window');
+  addStylesheet(doc);
+  const codePane = pane(root, 'code'); const transportPane = pane(root, 'transport');
+  codePane.dataset.syntax = 'fallback';
+  const holder = doc.createElement('div');
+  const disposeCanvasHost = render(() => createComponent(CodeSurface, {}), holder);
+  const hostEl = holder.firstElementChild as HTMLElement; codePane.appendChild(hostEl);
+  const vim = createVimMode(localStore(win), hostEl, deps.vimKeymap);
+  const surfaceEl = doc.createElement('canvas');
+  surfaceEl.className = 'vact-code-canvas'; surfaceEl.setAttribute('aria-hidden', 'true');
+  const inputContainer = doc.createElement('div'); inputContainer.className = 'vact-code-input-bridge';
+  const gpuStatus = doc.createElement('div'); gpuStatus.className = 'vact-code-gpu-status'; gpuStatus.setAttribute('role', 'status');
+  const diagTip = doc.createElement('div'); diagTip.className = 'vact-code-diag-tooltip'; diagTip.setAttribute('role', 'tooltip'); diagTip.hidden = true;
+  hostEl.append(surfaceEl, inputContainer, gpuStatus, diagTip);
+
+  const sync = new DocumentSync(client.document(DOC_FILE), Text.of(['']));
+  const surface = new HeadlessSurface({ sync });
+  const unapplied = new UnappliedEdits(surface.state.doc);
+  const [unappliedColor, setUnappliedColor] = createSignal(readUnappliedColor(localStore(win)));
+  const metrics = createMeasureContext(doc);
+  const textMetrics = metrics ?? { font: '', measureText: (text: string) => ({ width: text.length * 8 }) };
+  const layout = new TextLayout(textMetrics, { font: '13px ui-monospace, SFMono-Regular, Menlo, monospace', lineHeight: 18, baseline: 14 });
+  const previousBudget = deps.resourceBudget;
+  const ledger = previousBudget instanceof ResourceLedger ? previousBudget : new ResourceLedger();
+  if (!previousBudget) deps.resourceBudget = ledger;
+  const onStatus = (status: import('./renderer').GpuStatus): void => {
+    gpuStatus.textContent = status.kind === 'unavailable' ? 'GPU unavailable; editing and save remain available' : status.message;
+    gpuStatus.dataset.gpu = status.kind;
+  };
+  const renderer: CodeRenderer = new CanvasRenderer(surfaceEl, layout, { ledger, palette: readPalette(doc.documentElement), ...(opts.gl ? { gl: opts.gl } : {}),
+    ...(opts.createCanvas ? { createCanvas: opts.createCanvas } : {}), onStatus });
+  const schedulerHost = frameHost(win, opts.frameHost);
+  let scheduler: FrameScheduler | undefined;
+  let input: InputController | undefined;
+  let pointer: PointerController;
+  let momentaryPointer: MomentaryPointer;
+  let viewHost: CodeViewHost;
+  let disposed = false;
+  let evalRanges: { from: number; to: number; className: string }[] = [];
+  const [inlineOn, setInlineOn] = createSignal(readInlineWidgets(localStore(win)));
+  let sequencer: ReturnType<typeof createSequencerPlugin>;
+  let scope: ReturnType<typeof createScopePlugin>;
+  const hushHighlights = (): void => { highlight.clear(); sequencer?.clear(); };
+  let playingRanges: { from: number; to: number }[] = [];
+  let lastMomentaryLabels: string[] = [];
+  let handles: readonly SelectionHandle[] = [];
+  let syntaxProvider: SpanProvider = new FallbackSpans();
+  const vactLanguage = createVactLanguage(syntaxProvider);
+  const replaceSyntax = (next: SpanProvider): void => { syntaxProvider = next; vactLanguage.replace(next); };
+  let syntaxTruncated = 0;
+  let displayDoc: Text | null = null;
+  let renderedDoc: Text | null = null;
+  let displayRevision = -1;
+  let displayDirty = true;
+  let perfApi: VactrPerf | null = null;
+  let backgroundStop: (() => void) | null = null;
+  let backgroundCanvas: HTMLCanvasElement | null = null;
+  const placeBackground = (next: HTMLCanvasElement | null): void => {
+    if (backgroundCanvas && backgroundCanvas !== next) backgroundCanvas.remove();
+    backgroundCanvas = next;
+    if (!next) return;
+    next.classList.add('vact-code-backdrop');
+    next.setAttribute('aria-hidden', 'true');
+    hostEl.prepend(next);
+  };
+  let staticAnnotations: CodeAnnotation[] = [];
+  let syntaxSpans: CodeAnnotation[] = [];
+  let syntaxWindow: { from: number; to: number } | null = null;
+  let annotationsRevision = 0;
+  let renderedSelection: { anchor: number; head: number } | null = null;
+  const hideDiagnosticTip = (): void => { diagTip.hidden = true; };
+  const anchor = new TimeAnchor(clock, tier === 'browser' ? 'audio' : 'receipt');
+  const highlight = new HighlightScheduler({ clock, file: DOC_FILE, map: (span, rev) => sync.mapWireSpan(span, rev),
+    pin: (owner, rev) => sync.pin(owner, rev), unpin: (owner) => sync.unpin(owner), revision: () => sync.revision,
+    tempo: () => store.tempo, anchor, ...(deps.audible ? { audible: deps.audible, epoch: () => store.transportSample?.epoch ?? null } : {}) });
+  const evalCtl = new EvalController({ client, sync, onHush: hushHighlights, onEval: (reply, range) => {
+    const ids = unapplied.snapshot(range);
+    void reply.then(env => {
+      if (disposed || env.kind !== 'eval-result' || env.body.file !== DOC_FILE) return;
+      unapplied.acknowledge(ids, env.body, sync);
+      scheduler?.invalidateText('annotations');
+    }, () => {});
+    onEval?.(reply);
+  } });
+  const diagnostics = new DiagnosticsController({ client, sync, tier, ...(deps.core ? { core: deps.core } : {}),
+    text: () => surface.state.doc.toString(), afterPresent: (callback) => scheduler?.afterPresent(callback) ?? (() => {}),
+    isComposing: () => input?.isComposing ?? false, announce: (message) => input?.accessibility.announce(message) });
+  evalCtl.attach(surface);
+  const disposeFormat = formatKeymap(surface, () => deps.formatter);
+  const completion = deps.completion ? attachCompletion(surface, deps.completion) : null;
+
+  const transport = new TransportBar(transportPane, { client, clock, anchor,
+    sample: () => store.transportSample,
+    ...(deps.audible ? { audible: deps.audible } : {}),
+    pauseReason: () => {
+      const song = store.song(DOC_FILE);
+      return song?.applied && song.transport?.state !== 'ended' && song.transport?.state !== 'failed'
+        ? 'Pause is unavailable for finite songs' : '';
+    },
+    onHush: hushHighlights, audio: deps.core?.host.ctx ?? null, onRun: () => void evalCtl.evalAll(),
+    vim: { enabled: vim.enabled, toggle: () => vim.toggle() },
+    inline: { enabled: inlineOn, toggle: () => { const next = !inlineOn(); setInlineOn(next);
+      writeInlineWidgets(localStore(win), next); sequencer?.refresh(); scope?.refresh(); } },
+    unapplied: { color: unappliedColor, setColor: (color) => {
+      if (!validUnappliedColor(color)) return;
+      setUnappliedColor(color); saveUnappliedColor(localStore(win), color); scheduler?.invalidateText('annotations');
+    } } });
+  let onEval: ((reply: Promise<ServerEnvelope>) => void) | null = null;
+  onEval = (reply) => { void transport.audio.start(); transport.evalStarted(reply); };
+
+  const core = deps.core;
+  const library = tier === 'browser' ? new SampleLibrary({ ...(core ? { core } : {}),
+    ...(core ? { decode: (bytes: ArrayBuffer): Promise<DecodedAudio> => core.host.ctx.decodeAudioData(bytes) } : {}) }) : null;
+  const browser = new SampleBrowser(codePane, { tier, ...(library ? { library } : {}), storage: localStore(win) });
+  const samples: SampleLibraryApi = { frames: (bank, index) => library?.frames(bank, index) ?? null, openBrowser: (bank) => browser.open(bank) };
+  let evalRev: number | null = null;
+  const api: CodeApi = {
+    setBackgroundOpacity: (opacity) => { renderer.setBackgroundOpacity(opacity); scheduler?.invalidateText('gpu'); },
+    surface, mapWireSpan: (span, rev) => sync.mapWireSpan(span, rev),
+    toWireSpan: (from, to) => sync.toWireSpan(from, to),
+    currentRevision: (file) => file === DOC_FILE ? sync.revision : 0,
+    selectedSiteId: () => {
+      if (evalRev === null) return null;
+      const head = surface.state.selection.main.head; let best: { id: number; len: number } | null = null;
+      for (const site of store.sitesOf(DOC_FILE)) {
+        const range = sync.mapWireSpan(site.span, evalRev);
+        if (!range || head < range.from || head > range.to) continue;
+        if (!best || range.to - range.from < best.len) best = { id: site.id, len: range.to - range.from };
+      }
+      return best?.id ?? null;
+    }, samples,
+  };
+  deps.code = api;
+
+  const viewport = { width: 1, height: 1, dpr: schedulerHost.devicePixelRatio || 1, keyboardInset: 0 };
+  viewHost = new CodeViewHost(hostEl, surface, layout, schedulerHost, () => {
+    hideDiagnosticTip(); scheduler?.invalidateText('view');
+  });
+  const decorations = new DecorationStore(() => surface.state.doc.length);
+  const widgets = new WidgetSet(surface.state.doc.length);
+  const widgetLayer = new WidgetLayer(hostEl, layout, ledger);
+  const pluginViewport = () => { const v = viewHost.viewport; return {
+    fromLine: layout.heightmap.lineAtHeight(Math.max(0, v.scrollTop - v.height)).line,
+    toLine: Math.min(surface.state.doc.lines, layout.heightmap.lineAtHeight(v.scrollTop + v.height * 2).line + 1),
+    top: v.scrollTop, height: v.height }; };
+  const runtime = new PluginRuntime({ store: decorations, widgets, getState: () => surface.state,
+    requestFrame: () => scheduler?.request(), coordsAtPos: pos => surface.coordsAtPos(pos),
+    lineTop: line => layout.heightmap.lineTop(line), viewport: pluginViewport,
+    theme: () => { const palette = readPalette(doc.documentElement); return { palette, tokens: palette.token }; } });
+  sequencer = createSequencerPlugin({ file: DOC_FILE, beatsPerCycle: () => store.tempo?.beats_per_cycle ?? 4,
+    mapSpan: (span, rev) => sync.mapWireSpan(span, rev),
+    forms: () => evalRev === null ? [] : store.forms(DOC_FILE).flatMap(form => {
+      const mapped = sync.mapWireSpan(form.span, evalRev!); return mapped ? [mapped] : []; }),
+    cycles: () => transport.cycles(), running: () => transport.isRunning(), enabled: inlineOn });
+  scope = createScopePlugin({ time: () => clock.now(), latestOnReceipt: () => tier === 'native' && !deps.audible, enabled: inlineOn });
+  runtime.add(createBeatGlowPlugin({ playing: () => playingRanges,
+    flashes: () => evalRanges.map(r => ({ from: r.from, to: r.to, error: !!r.className?.includes('error') })) }));
+  runtime.add(sequencer.plugin); runtime.add(scope.plugin);
+  let widgetRevision = -1;
+  input = new InputController(surface, inputContainer, {
+    label: 'Code editor', scrollCaret: () => viewHost.scrollCaret(),
+    evalSelection: () => { if (vim.enabled()) void evalCtl.evalAtCursor(); },
+    evalAll: () => { if (vim.enabled()) void evalCtl.evalAll(); },
+    stopAll: () => { if (vim.enabled()) transport.stopAll(); },
+    cut: () => { if (vim.enabled()) transport.hush(); },
+    onPresentation: (presentation) => {
+      const previousDoc = displayDoc;
+      if (previousDoc !== presentation.doc) {
+        const changes = presentation.changesBase === previousDoc ? presentation.changes : undefined;
+        layout.setText(presentation.doc, changes);
+        displayDoc = presentation.doc;
+        displayDirty = true;
+        scheduler?.invalidateText('doc');
+      }
+    } });
+  viewHost.setFocus(() => input.focus());
+  pointer = new PointerController(surface, surfaceEl, { focus: () => input.focus(), scrollBy: (x, y) => viewHost.scrollBy(x, y),
+    onHandles: (next) => { handles = next; scheduler?.setActive('handles', next.length > 0); scheduler?.invalidateText('selection'); },
+    composing: () => input.isComposing });
+  vim.connect({ surface, input, viewHost, layout, evalCtl, formatter: () => deps.formatter,
+    diagnostics,
+    onChange: () => scheduler?.invalidateText('selection') });
+  momentaryPointer = new MomentaryPointer(surface, surfaceEl, { cancelSelection: () => pointer.cancel() });
+  const forwardPointer = (event: Event): void => surface.notifyPointer(event as PointerEvent);
+  const pointerNames = ['pointerdown', 'pointermove', 'pointerup', 'pointercancel'] as const;
+  for (const name of pointerNames) surfaceEl.addEventListener(name, forwardPointer);
+  const removePointerForwarding = (): void => { for (const name of pointerNames) surfaceEl.removeEventListener(name, forwardPointer); };
+
+  const perfEnabled = new URLSearchParams(win.location.search).get('perf') === '1';
+  scheduler = new FrameScheduler(schedulerHost, doc, hostEl, { perf: perfEnabled, revision: () => sync.revision,
+    onViewport(info) {
+      Object.assign(viewport, info);
+      viewHost.setViewport(info);
+      renderer.setViewport(viewHost.viewport, info.dpr);
+      surface.notifyBlur(); // CompletionPopup closes if the caret can no longer be anchored.
+    },
+    onFrame(ctx) {
+      if (disposed) return;
+      if (ctx.textDirty) { viewHost.invalidateRect(); viewHost.refreshRect(); }
+      input.flushBridge();
+      const audible = deps.audible?.sample(ctx.frameMs) ?? { time: clock.now(), targetMs: ctx.frameMs, provenance: 'unavailable' as const, valid: false };
+      playingRanges = highlight.tick(ctx.frameMs);
+      scheduler?.setActive('playing', highlight.size > 0);
+      transport.tick(ctx.frameMs);
+      runtime.viewportChanged(pluginViewport());
+      const runtimeActive = runtime.frame(ctx.frameMs);
+      if (widgetRevision !== widgets.revision) {
+        const before = layout.heightmap.revision;
+        const caret = surface.coordsAtPos(surface.state.selection.main.head);
+        const view = viewHost.viewport;
+        const caretVisible = caret !== null && caret.bottom > (view.top ?? 0) && caret.top < (view.top ?? 0) + view.height;
+        layout.heightmap.setBlocks(widgets.entries(surface.state.doc)); widgetRevision = widgets.revision;
+        if (layout.heightmap.revision !== before) {
+          const caretLine = surface.state.doc.lineAt(surface.state.selection.main.head).number - 1;
+          if (caretVisible && widgets.blocks(surface.state.doc).some(block => block.line < caretLine || (block.line === caretLine && block.side === 'above'))) viewHost.scrollCaret();
+          if (!ctx.textDirty) scheduler?.invalidateText('view');
+        }
+      }
+      const plugin = decorations.collect(ctx.frameMs, surface.state.doc);
+      scheduler?.setActive('transport', !!store.tempo);
+      if (ctx.textDirty && (displayDirty || displayRevision !== sync.revision)) {
+        displayRevision = sync.revision;
+        const presentation = input.presentation;
+        if (renderedDoc !== presentation.doc) { renderedDoc = presentation.doc; timed('upload', () => renderer.setText(renderedDoc!)); }
+        displayDirty = false;
+      }
+      if (ctx.textDirty) {
+        const view = viewHost.viewport;
+        const first = layout.heightmap.lineAtHeight(view.scrollTop - view.height).line;
+        const last = Math.min(surface.state.doc.lines, layout.heightmap.lineAtHeight(view.scrollTop + view.height * 2).line + 1);
+        const from = surface.state.doc.line(Math.min(surface.state.doc.lines, first + 1)).from;
+        const to = surface.state.doc.line(Math.max(1, last)).to;
+        const range = { view, from, to };
+        const windowChanged = !syntaxWindow || syntaxWindow.from !== range.from || syntaxWindow.to !== range.to;
+        const syntaxDirty = ctx.reasons.has('doc') || ctx.reasons.has('syntax') || ctx.reasons.has('gpu') || windowChanged;
+        const result = syntaxDirty
+          ? timed('syntax', () => { const result = vactLanguage.language.spans(surface.state, range.from, range.to, 16384); return { spans: result.spans.map((span) => ({ from: span.from, to: span.to, kind: 'syntax' as const, className: span.tag })), truncated: result.truncated }; })
+          : { spans: syntaxSpans, truncated: false };
+        if (syntaxDirty) { syntaxSpans = result.spans; syntaxWindow = { from: range.from, to: range.to }; }
+        syntaxTruncated += result.truncated ? 1 : 0;
+        if (syntaxProvider instanceof FallbackSpans) codePane.dataset.syntax = 'fallback';
+        const selection = surface.state.selection.main;
+        const staticRows = [...result.spans, ...unapplied.annotations(surface.state.doc), ...surface.annotationRanges(),
+          ...(selection.empty ? [] : [{ from: selection.from, to: selection.to, kind: 'selection' as const }]),
+          ...input.presentation.annotations];
+        const momentaryRows = surface.animatedRows(ctx.frameMs);
+        if (perfEnabled) lastMomentaryLabels = momentaryRows.filter((row) => row.kind === 'momentary').map((row) => row.label ?? '');
+        scheduler?.setActive('momentary', momentaryRows.length > 0);
+        const animatedRows: CodeAnnotation[] = momentaryRows;
+        const annotations = { staticRows, animatedRows, cursor: input.presentation.cursor };
+        const selectionChanged = !renderedSelection || renderedSelection.anchor !== surface.state.selection.main.anchor ||
+          renderedSelection.head !== surface.state.selection.main.head;
+        if (selectionChanged || !sameAnnotations(staticAnnotations, staticRows)) annotationsRevision++;
+        renderedSelection = { anchor: surface.state.selection.main.anchor, head: surface.state.selection.main.head };
+        staticAnnotations = annotations.staticRows;
+        timed('upload', () => {
+          renderer.setViewport(range.view, viewport.dpr);
+          renderer.render({ plugin, unappliedColor: unappliedColor(), annotations: staticAnnotations, annotationsRevision, animated: annotations.animatedRows, textRevision: displayRevision, ...vim.cursor(annotations.cursor), ...vim.overlay(), cursorVisible: true, handles });
+        });
+        const dropped = highlight.stats.overflow + highlight.stats.horizonDrops + highlight.stats.epochDrops + client.queueStats.dropped;
+        if (dropped) gpuStatus.dataset.telemetryDropped = String(dropped); else delete gpuStatus.dataset.telemetryDropped;
+      } else {
+        const momentaryRows = surface.animatedRows(ctx.frameMs);
+        if (perfEnabled) lastMomentaryLabels = momentaryRows.filter((row) => row.kind === 'momentary').map((row) => row.label ?? '');
+        scheduler?.setActive('momentary', momentaryRows.length > 0);
+        const animated = momentaryRows;
+        timed('upload', () => {
+          renderer.setViewport(viewHost.viewport, viewport.dpr);
+          renderer.render({ plugin, unappliedColor: unappliedColor(), annotations: staticAnnotations, annotationsRevision, animated, textRevision: displayRevision, ...vim.cursor(input.presentation.cursor), ...vim.overlay(), cursorVisible: true, handles });
+        });
+      }
+      const layerAnimating = widgetLayer.update({ view: viewHost.viewport, dpr: viewport.dpr, frameMs: ctx.frameMs,
+        blocks: widgets.blocks(surface.state.doc), eols: widgets.eols(surface.state.doc) }).animating;
+      scheduler?.setActive('plugins', runtimeActive || layerAnimating);
+      if (!backgroundStop && deps.visual?.onBackgroundCanvas) backgroundStop = deps.visual.onBackgroundCanvas(placeBackground);
+      if (renderer.textPending) scheduler?.request();
+      const perf = scheduler?.perf;
+      if (perf && perfApi) {
+        const sample = deps.audible?.sample(ctx.frameMs) ?? audible;
+        const ordered = [...playingRanges].sort((a, b) => a.from - b.from || a.to - b.to);
+        const activeKey = ordered.map((r) => `${r.from}-${r.to}`).join(',');
+        recordPresented(perfApi, { frameMs: ctx.frameMs, targetMs: sample.targetMs, audibleTime: sample.time,
+          provenance: sample.provenance, valid: sample.valid, activeKey, beatCycle: transport.state.cycle,
+          beatFlash: transport.state.beatFlash, revision: sync.revision, handles: handles.length, epoch: store.transportSample?.epoch ?? null });
+      }
+    } });
+  const removeAnimatedWake = surface.onAnimatedWake(() => { scheduler?.setActive('momentary', true); scheduler?.request(); });
+  const phaseTimer = scheduler.perf?.phases ?? null;
+  input.setPhases(phaseTimer); viewHost.setPhases(phaseTimer); renderer.setPhases(phaseTimer);
+  if (phaseTimer) (globalThis as typeof globalThis & { __vactrPhaseTimer?: typeof phaseTimer }).__vactrPhaseTimer = phaseTimer;
+  scheduler.invalidateText('doc');
+
+  const keyRecord = (event: Event): void => scheduler?.perf?.recordKey((event as KeyboardEvent).timeStamp, sync.revision);
+  const noteDiagInput = (): void => diagnostics.noteInput();
+  const diagInputEvents = ['keydown', 'beforeinput', 'compositionstart', 'compositionupdate', 'compositionend'] as const;
+  input.accessibility.textarea.addEventListener('keydown', keyRecord);
+  for (const name of diagInputEvents) input.accessibility.textarea.addEventListener(name, noteDiagInput);
+  const stopFlash = evalCtl.onFlash((range, kind) => {
+    if (kind) evalRanges = [...evalRanges.filter((r) => !(r.from === range.from && r.to === range.to)), { ...range, className: kind }];
+    else evalRanges = evalRanges.filter((r) => !(r.from === range.from && r.to === range.to));
+    scheduler.setActive('eval', evalRanges.length > 0); scheduler.request();
+  });
+  let surfaceDocLength = surface.state.doc.length;
+  const stopSurface = surface.subscribe((update) => {
+    unapplied.update(update, sync.revision);
+    scheduler.invalidateText(update.docChanged ? 'doc' : update.selectionSet ? 'selection' : 'annotations');
+    if (update.docChanged) {
+      runtime.docChanged(update);
+      let changeCount = 0, wholeDocumentReplacement = false;
+      update.changes.iterChanges((fromA, toA) => {
+        changeCount++;
+        if (fromA === 0 && toA === surfaceDocLength) wholeDocumentReplacement = true;
+      });
+      if (changeCount === 1 && wholeDocumentReplacement) layout.resetWidestShaped();
+      surfaceDocLength = update.state.doc.length;
+      hideDiagnosticTip(); vactLanguage.language.noteChanges?.(update.changes, update.state);
+    }
+  });
+  diagnostics.attach(surface);
+  const showDiagnosticTip = (event: Event): void => {
+    const pointerEvent = event as PointerEvent;
+    if (input.isComposing || pointerEvent.buttons !== 0) { hideDiagnosticTip(); return; }
+    const pos = surface.posAtCoords({ x: pointerEvent.clientX, y: pointerEvent.clientY });
+    const diagnostic = pos === null ? null : diagnostics.diagnosticAt(pos);
+    const coords = diagnostic ? surface.coordsAtPos(diagnostic.from) : null;
+    if (!diagnostic || !coords) { hideDiagnosticTip(); return; }
+    const hostRect = hostEl.getBoundingClientRect();
+    diagTip.textContent = diagnostic.message;
+    diagTip.style.left = `${coords.left - hostRect.left}px`;
+    diagTip.style.top = `${coords.bottom - hostRect.top}px`;
+    diagTip.hidden = false;
+  };
+  surfaceEl.addEventListener('pointermove', showDiagnosticTip);
+  surfaceEl.addEventListener('pointerleave', hideDiagnosticTip);
+
+  const offs: (() => void)[] = [
+    client.on('playing', (env) => {
+      if (env.kind !== 'playing') return;
+      highlight.onPlaying(env.body.events, { ahead: env.body.ahead, retract: env.body.retract });
+      sequencer.onPlaying(env.body.events);
+      transport.onPlaying(env.body.events); scheduler.setActive('playing', true);
+    }),
+    client.on('eval-result', (env) => {
+      if (env.kind !== 'eval-result') return;
+      if (env.body.file === DOC_FILE) {
+        evalRev = env.body.doc_revision; sync.pin('eval', evalRev);
+        unapplied.acknowledgeForms(env.body, sync); scheduler.invalidateText('annotations');
+      }
+      transport.onDiagnostics(env.body.diagnostics);
+    }),
+    client.on('diag', (env) => { if (env.kind === 'diag') transport.onDiagnostics(env.body.add); }),
+    store.subscribe(['tempo'], (_c, s) => { if (s.tempo) transport.onTempo(s.tempo); }),
+    store.subscribe(['levels'], (_c, s) => { if (s.levels) { transport.onLevels(s.levels); scope.onLevels(s.levels); } }),
+    store.subscribe(['manifest'], (_c, s) => browser.setSounds(s.manifest?.sounds ?? [])),
+    highlight.onAccept((onset) => recordOnset(perfApi, { ...onset, receivedMs: win.performance.now() })),
+    highlight.onRetract((id) => retractOnset(perfApi, id)),
+  ];
+  if (store.tempo) transport.onTempo(store.tempo);
+  if (store.levels) { transport.onLevels(store.levels); scope.onLevels(store.levels); }
+  browser.setSounds(store.manifest?.sounds ?? []);
+
+  const loadMainThreadSyntax = (): void => {
+    if (!deps.syntax) { replaceSyntax(new FallbackSpans()); codePane.dataset.syntax = 'fallback'; return; }
+    void deps.syntax().then((syntax) => {
+      if (disposed) return;
+      syntaxProvider.dispose?.();
+      replaceSyntax(new SyntaxSpans(syntax, () => scheduler.invalidateText('syntax'), (cb) => scheduler.afterPresent(cb)));
+      codePane.dataset.syntax = 'tree-sitter'; scheduler.invalidateText('syntax');
+    }, () => { if (!disposed) { replaceSyntax(new FallbackSpans()); codePane.dataset.syntax = 'fallback'; scheduler.invalidateText('syntax'); } });
+  };
+  if (deps.syntaxWorker) {
+    try {
+      let workerProvider: WorkerSyntaxSpans | null = null;
+      workerProvider = new WorkerSyntaxSpans(deps.syntaxWorker(), doc.baseURI,
+        () => scheduler.invalidateText('syntax'), loadMainThreadSyntax,
+        () => { if (syntaxProvider === workerProvider) codePane.dataset.syntax = 'tree-sitter-worker'; });
+      replaceSyntax(workerProvider);
+    } catch { loadMainThreadSyntax(); }
+  } else loadMainThreadSyntax();
+  if (perfEnabled && scheduler.perf) perfApi = installPerfHook({ win, perf: scheduler.perf, surface, revision: () => sync.revision,
+    ledger, highlight, renderer, client, store, syntaxTruncated: () => syntaxTruncated,
+    transportOutput: () => transport.el.querySelector<HTMLElement>('.vact-play-toggle')?.dataset.output ?? 'idle',
+    outputHistory: () => transport.outputHistory(), momentaryLabels: () => lastMomentaryLabels,
+    disposeCode: () => mounted.dispose() });
+
+  const colorScheme = win.matchMedia?.('(prefers-color-scheme: dark)');
+  const updatePalette = (): void => { renderer.setPalette(readPalette(doc.documentElement)); scheduler?.invalidateText('gpu'); };
+  colorScheme?.addEventListener('change', updatePalette);
+
+  const mounted: Mounted = {
+    dispose() {
+      if (disposed) return; disposed = true;
+      runtime.destroy(); widgetLayer.dispose(); scheduler.dispose(); momentaryPointer.dispose(); pointer.dispose(); vim.dispose(); input.dispose(); renderer.dispose(); viewHost.dispose();
+      removePointerForwarding(); input.accessibility.textarea.removeEventListener('keydown', keyRecord);
+      for (const name of diagInputEvents) input.accessibility.textarea.removeEventListener(name, noteDiagInput);
+      surfaceEl.removeEventListener('pointermove', showDiagnosticTip); surfaceEl.removeEventListener('pointerleave', hideDiagnosticTip);
+      removeAnimatedWake(); for (const off of offs) off(); stopFlash(); stopSurface(); diagnostics.dispose(); evalCtl.dispose();
+      disposeFormat(); completion?.dispose(); vactLanguage.language.dispose?.(); backgroundStop?.();
+      colorScheme?.removeEventListener('change', updatePalette);
+      backgroundCanvas?.remove(); backgroundCanvas = null;
+      transport.dispose(); browser.dispose(); surface.dispose(); disposeCanvasHost(); hostEl.remove();
+      if (deps.code === api) delete deps.code;
+      if (!previousBudget && deps.resourceBudget === ledger) delete deps.resourceBudget;
+      if (phaseTimer && (globalThis as typeof globalThis & { __vactrPhaseTimer?: typeof phaseTimer }).__vactrPhaseTimer === phaseTimer)
+        delete (globalThis as typeof globalThis & { __vactrPhaseTimer?: typeof phaseTimer }).__vactrPhaseTimer;
+      removePerfHook(win);
+    },
+  };
+  return mounted;
+}
+
+function timed<T>(phase: import('emaki/engine').PerfPhase, run: () => T): T {
+  const timer = (globalThis as typeof globalThis & { __vactrPhaseTimer?: import('emaki/engine').PhaseTimer }).__vactrPhaseTimer;
+  timer?.begin(phase);
+  try { return run(); } finally { timer?.end(phase); }
+}

@@ -1,0 +1,10 @@
+# Acid techno at 132 BPM: accented and sliding diode-ladder bass.
+use-bpm 132
+
+# Four-on-the-floor kick and restrained offbeat hats leave room for the bass.
+s :phase-drum > note [:c1 :c1 :c1 :c1] > fm-amount 1.4 > pitch-sweep 0.7 > decay 0.3 > drive 0.25 > gain 0.32 > d1
+s :dual-hat-voice > note [nil :a5 nil :a5 nil :a5 nil :a5] > hat-harmonics 0.7 > timbre 0.65 > morph 0.6 > gain 0.08 > d2
+
+# Sixteen-step acid phrase: slide-from describes the incoming interval; cut 1
+# crossfades the previous voice while the new voice keeps its envelope.
+s :acid-bass > note [:c2 :c2 :eb2 :g1 :c2 nil :bb1 :g1 :c2 :c2 :eb2 :g1 :bb1 :g1 :eb2 :c2] > accent [1 0 0 0 0 1 0 0 1 0 0 1 0 0 1 0] > slide-from [0 0 0 8 0 0 0 0 0 0 0 8 0 0 0 0] > gate-length [0.55 0.55 1 0.55 0.55 0.55 0.55 0.55 0.55 0.55 1 0.55 0.55 0.55 0.55 0.55] > cut 1 > cutoff {range sine 250 900} > gain 0.3 > d3

@@ -1,0 +1,19 @@
+# Sample-free effect audition. Persistent bus keeps tails between triggers.
+# Run: target/debug/vactr run examples/effect-labs/schroeder-reverb.vact --host native --cycles 16
+# Left = quiet dry reference; right = effect. Set both pans to 0.5 for centered listening.
+
+inst lab-strike:
+	{saw freq > * 0.55} > + {* {sin-osc freq} 0.45}
+		> * {env-perc 0.001 0.08} > * amp
+
+use-bpm 120
+
+bus :audition:
+	schroeder-reverb size: 0.8 decay: 3.5 damping: 0.45 mix: 0.45
+
+master:
+	limiter ceiling: -2 release: 0.08
+
+let probe s :lab-strike > note [:g3 nil :d4 nil] > slow 2 > gain 0.3
+probe > gain 0.4 > pan 0.15 > d1
+probe > pan 0.85 > bus :audition > d2

@@ -1,0 +1,423 @@
+{
+  "taskId": "me-middle-20260925-s175",
+  "workflowMode": "issue-resolution",
+  "workflowExecutionId": "claude-code-design-and-implement-review-loop-session-180",
+  "issueReference": {
+    "repository": "tacogips/vactr",
+    "number": 2,
+    "url": "https://github.com/tacogips/vactr/issues/2"
+  },
+  "implementationBranch": "main",
+  "baseBranch": "main",
+  "remote": "origin",
+  "originalHead": "f27253652c1db420a452c008e11cc0998abe8c99",
+  "parentPlanPath": "impl-plans/active/vactr-core.md",
+  "planIndexPath": "impl-plans/README.md",
+  "designDocPaths": [
+    "design-docs/specs/design-implementation.md",
+    "design-docs/specs/architecture.md",
+    "design-docs/specs/lang-reference.md",
+    "design-docs/specs/design-music.md",
+    "design-docs/specs/design-visual.md",
+    "design-docs/user-qa/pending-middle-end-questions.md",
+    "design-docs/user-qa/pending-frontend-questions.md"
+  ],
+  "evidenceRoot": "tmp/me-middle-20260925-s175",
+  "evidenceLayout": "tmp/me-middle-20260925-s175/<planId>/attempt-<n>/ holds pre-edit-hashes.txt, intent.md, post-edit-hashes.txt and final-hashes.txt (tmp is gitignored). Cargo logs go to target/fe-logs/<plan>-<check>-s<S>-<n>.log per design 6.5.7.",
+  "logRule": "Design 6.5.7: every cargo run writes a new target/fe-logs/<plan>-<check>-s<S>-<n>.log (S = Riela session number; n counts from 1 per check within the session; never overwrite). Run each cargo command as (set -o pipefail; CMD 2>&1 | tee LOG); echo \"exit=$?\" >> LOG. The progress log cites the counting log path and its exit= value, and for nextest and cargo test the run and passed counts (run > 0). A missing log, a log without exit=, or a truncated log fails the check. 'LOG(<plan>-<check>): CMD' in the verification arrays means CMD run under this rule.",
+  "commonContract": {
+    "editProtocol": "vactr-middle-masks.md section 'Edit Protocol (common to every ME plan)': fresh read and sha256 before each edit, intent snapshot before each sharedPath edit, post-edit hash, stop and reapply on drift, keep the tree compiling, never edit files outside writePaths/sharedPaths, rustfmt on owned files only, no git reset/clean/stash/checkout, no branches or worktrees, no commits, final-hashes.txt at the end.",
+    "gateContract": "The step6-implement output payload carries planId. The test-integrity and adversarial-review outputs carry NO planId and always carry a findings array (empty when there are none).",
+    "parallelSafety": "ME-CHECK, ME-VM and ME-PATTERN run in the same working directory at the same time (and ME-REACTIVE may overlap ME-CHECK/ME-PATTERN). Their writePaths and sharedPaths are disjoint. A build error in another plan's file is waited out and recorded, never fixed by the observer; serial repair happens at the join (reconcile step) and in ME-INTEGRATE.",
+    "commitPolicy": "The source tree stays uncommitted until the workflow commit step. The plan/design checkpoint commit (before fanout) stages by explicit path only: design-docs/specs/, design-docs/user-qa/, impl-plans/active/, impl-plans/README.md, and tests/fixtures/spec/manifest.toml (it changed together with lang-reference.md line 783 and design-music.md block 2; without it verbatim_cases_appear_in_their_document fails at the checkpoint HEAD). It never stages src/, Cargo.toml or Cargo.lock. The single implementation commit on main uses the six CLAUDE.md sections on separate lines and no AI attribution or Co-Authored-By line; its staging list is in vactr-middle-finalize.md.",
+    "normativeDesign": "design-implementation.md 5.6, 6.5.8, 7.1 and 10.1 are normative. Where a plan and the design differ, the design wins and the difference goes in that plan's progress log."
+  },
+  "reviewContext": {
+    "issueReference": {
+      "repository": "tacogips/vactr",
+      "number": 2,
+      "url": "https://github.com/tacogips/vactr/issues/2",
+      "title": "Implement the language middle end: checker, namespace/compiler/VM, pattern engine (TASK-004..006)",
+      "baseCommit": "51c5af700e616e360972bf07a127274127d24384",
+      "implementationPlanPath": "impl-plans/active/vactr-core.md"
+    },
+    "constraints": [
+      "Implement exactly the TASK-004/005/006 deliverables and completion criteria in impl-plans/active/vactr-core.md. design-implementation.md 5.6, 6.5.8, 7.1 and 10.1 are normative and win over the plans.",
+      "Rust names follow the design type names. Files at 800+ lines are split, with a hard limit of 1000 lines (CLAUDE.md).",
+      "No new crate dependencies and no panics on untrusted input. Host I/O for load/sample stays behind NoopHost.",
+      "Cargo runs with CARGO_TERM_QUIET=true and writes one complete log per command under target/fe-logs/ with exit= recorded. Evidence lives under tmp/me-middle-20260925-s175/<planId>/attempt-<n>/ (gitignored).",
+      "Every plan verification includes plain CARGO_TERM_QUIET=true cargo test in addition to nextest. The step6 output carries planId. The test-integrity and adversarial-review outputs carry findings and no planId.",
+      "The source tree stays uncommitted until the workflow commit step. There is a single implementation commit on main, pushed, with the six CLAUDE.md sections on separate lines and no AI attribution or Co-Authored-By line.",
+      "Secret-dependent commands run through kinko exec. No secret values are committed."
+    ],
+    "designDecisionsAndRationale": [
+      "Q1 parent-scope model (author, 2026-09-25). The scope chain is prelude -> session -> fn/block. Same-scope rebinding is an error. Shadowing a prelude name is a hint, shadowing a user-defined parent name is a warning, and the prelude is read-only. Sources: lang-reference.md section 4 and the design-music.md sound kits section.",
+      "path/url literal types: Nix-style unquoted paths containing /, and scheme:// urls. They are resolved relative to the containing file, which needs a front-end amendment (ME-FRONTEND). load path evaluates the file in a fresh child scope of the prelude and returns its last expression.",
+      "default-sound-kit and sound-kit are prelude bindings. s resolves keywords against the late-bound sound-kit, so the keyword set check follows the current kit value instead of a fixed host set.",
+      "SOUND FIRST: a chain starts with s <sound>, and n/note [..] > s :x is a checker error. First-structure rule: the first list-valued step defines the structure, later list controls are sampled at the existing onsets, and s [..] is structured from the start.",
+      "Destination/source model: instruments (builtin, inst, MIDI out via s {midi 1}) are destinations. Sources are step lists, midi-notes (after s) and signals. d1..d9 are the only sinks.",
+      "M1 overloads scale/shape on the subject type. M2 makes range subject-first. M3 makes inst header parameters control names. Q3 names Tidal struct as grid. Q4 keeps both gain and amp. Chord qualities are letter-first keywords (:dom7, never :7).",
+      "U5: the checker diagnoses a bare field-less enum variant used as a binding pattern in if/match. This obligation is carried over from the expander.",
+      "Late domain parameters (design-implementation.md 5.5): osc {* 20 {sin time}} keeps its thunk alive and forces it once per resolve_uniforms. osc is all-Late."
+    ],
+    "intentionalTradeoffs": [
+      "Host I/O for load/sample, the slot table, the scheduler and staging invalidation are deferred to TASK-007..010. NoopHost stubs keep the middle end testable now.",
+      "The wave DAG is MASKS -> FRONTEND -> {CHECK, VM, PATTERN} -> REACTIVE -> INTEGRATE -> FINAL, sequenced only where source dependencies force it. types/masks.rs comes first because the compiler consumes it.",
+      "Plans have disjoint writePaths. Shared files (types/mod.rs, ns/mod.rs, vm/mod.rs, lib.rs) are owned sequentially. The pre/post sha256 edit protocol applies, serial repair happens in ME-INTEGRATE, and crate-wide fmt runs only in ME-FINAL.",
+      "Open user-QA items M4 (an unstructured sound at a sink plays one event per cycle) and M5 (# ends a url) follow the recommendations. M6 (two let sound-kit lines in one design-music block) is deferred and not pinned.",
+      "The TASK-006 11.3 staging-invalidation clause is evidenced only at the re-query level. ME-FINAL notes this or leaves the box unchecked (accepted residual risk).",
+      "ME-VM and ME-REACTIVE may need several sessions (accepted residual risk)."
+    ],
+    "supportedEdgeCases": [
+      "Same-scope rebinding (error), prelude shadow (hint), user-parent shadow (warning), and writes to the read-only prelude.",
+      "The path forms ./x ../x ~/x /abs/x and scheme:// urls. # ends a url (M5).",
+      "n [..] > s :x and note [..] > s :x are rejected. s [..] is structured from the start. A single-sound subject has no structure. midi-notes is a structure-giving step after s.",
+      "Rebinding sound-kit changes the keyword set that s sees (late-bound).",
+      "A bare field-less enum variant used as a binding pattern in if/match (U5).",
+      "A Late thunk is not forced at the call boundary and is forced once per resolve_uniforms at two frame times (real osc, through ME-INTEGRATE).",
+      "Pattern goldens, sample-region cover equivalence, forcing masks and reactive propagation.",
+      "Chord keywords: [:g :7] stays a negative lexer case (src/reader/tests/lexer.rs:90) and [:g :dom7] is the verbatim positive case."
+    ],
+    "outOfScopeEdgeCases": [
+      "Real file and sample I/O, package loading, DSP output, and scheduler and slot-table behavior (TASK-007..010).",
+      "Frozen mode, and session/REPL/LSP/editor behavior.",
+      "M6 (multiple let sound-kit lines in one block) and the two open authority questions."
+    ],
+    "sourcePaths": [
+      "impl-plans/active/vactr-core.md",
+      "impl-plans/README.md",
+      "design-docs/specs/design-implementation.md",
+      "design-docs/specs/architecture.md",
+      "design-docs/specs/lang-reference.md",
+      "design-docs/specs/design-music.md",
+      "design-docs/specs/design-visual.md",
+      "design-docs/user-qa/README.md",
+      "design-docs/user-qa/pending-middle-end-questions.md",
+      "design-docs/user-qa/pending-frontend-questions.md",
+      "tests/fixtures/spec/manifest.toml",
+      "tests/spec_fixtures.rs",
+      "src/reader/tests/lexer.rs",
+      "impl-plans/active/vactr-middle-masks.md",
+      "impl-plans/active/vactr-middle-frontend.md",
+      "impl-plans/active/vactr-middle-check.md",
+      "impl-plans/active/vactr-middle-vm.md",
+      "impl-plans/active/vactr-middle-pattern.md",
+      "impl-plans/active/vactr-middle-reactive.md",
+      "impl-plans/active/vactr-middle-integrate.md",
+      "impl-plans/active/vactr-middle-finalize.md"
+    ],
+    "userProblem": "Issue #2: implement the Vactr language middle end (TASK-004 checker, TASK-005 namespace/compiler/VM/tweak slots/reactive graph, TASK-006 pattern engine/signals/clock/visual chains) from impl-plans/active/vactr-core.md, plus the 2026-09-25 amendments: parent-scope shadowing, path/url literals with load/sample, the sound-kit prelude bindings with the kit: argument, SOUND FIRST with the first-structure rule, midi-notes after s, and the U5 checker diagnostic.",
+    "requiredOutcomes": [
+      "Every TASK-004, TASK-005 and TASK-006 completion criterion in vactr-core.md is checked with evidence, and the statuses are COMPLETED (ME-FINAL).",
+      "Spec fixtures type-check, compile and run per their classification through read -> expand -> check -> compile -> run (ME-INTEGRATE).",
+      "Pattern goldens, sample-region cover equivalence, forcing-mask and reactive-propagation cases pass as tests (ME-PATTERN, ME-VM, ME-REACTIVE).",
+      "The checker rejects n [..] > s :x and note [..] > s :x; U5 is diagnosed; same-scope rebinding is an error; a prelude shadow is a hint and a user-parent shadow is a warning (ME-CHECK).",
+      "path/url literals are read, have Value variants and are typed; load path and sample path type-check with host I/O behind NoopHost (ME-FRONTEND, ME-CHECK, ME-REACTIVE).",
+      "Build, clippy -D warnings, fmt --check, nextest, cargo test and both wasm32 builds exit 0 on the final tree (ME-FINAL)."
+    ],
+    "nonGoals": [
+      "TASK-007..010: slot table, scheduler, staging invalidation, layer-2 dedup, hosts, file and sample I/O, DSP, package loading, session/REPL/LSP, editor.",
+      "Frozen mode.",
+      "Answering the open user-QA items M4-M6 or the two authority questions; the recommendations are followed and pinned.",
+      "Adding crate dependencies."
+    ],
+    "decisionsNotToReopen": [
+      "Q1 parent-scope model; path/url literal types; default-sound-kit/sound-kit and the kit: argument; M1-M3; SOUND FIRST and the first-structure rule; MIDI out is an instrument and d1..d9 are the only sinks; destination/source model; Q3 grid; Q4 gain and amp; letter-first chord keywords."
+    ],
+    "openUserQa": [
+      "M4 unstructured sound at a sink plays one event per cycle (followed).",
+      "M5 # ends a url (followed).",
+      "M6 two let sound-kit lines in one design-music block (block deferred; not pinned)."
+    ],
+    "carriedFindings": [
+      "Step 3 low finding: the manifest edits of the design-doc step (three import cases rewritten sound-first; design-music block 2 stray-char@37) were not verified by cargo because the design sandbox could not run cargo. ME-MASKS V3f is the first run; ME-FRONTEND then turns design-music block 2 clean."
+    ]
+  },
+  "plans": [
+    {
+      "planId": "ME-FINAL",
+      "planPath": "impl-plans/active/vactr-middle-finalize.md",
+      "implementsTask": "TASK-004..006 reconciliation, crate-wide fmt, plan bookkeeping",
+      "wave": 6,
+      "status": "ready",
+      "dispatchNote": "RECON-S184-1 review-pass redispatch on the unchanged tree. The session-183 bookkeeping is done (see completion); the redispatch re-runs the gate on the current tree and must not rewrite plan documents or this manifest unless a review finding requires it. The step6-implement payload carries planId. The step7-adversarial-review output carries a findings array ([] when none) and NO planId. Evidence goes to tmp/me-middle-20260925-s175/ME-FINAL/attempt-2/.",
+      "dependsOn": [],
+      "progressFile": "impl-plans/active/vactr-middle-finalize.md#progress-log",
+      "writePaths": [
+        "impl-plans/active/vactr-core.md",
+        "impl-plans/README.md",
+        "impl-plans/active/me-middle-20260925-s175-dispatch.json",
+        "impl-plans/completed/fe-frontend-20260925-s165-dispatch.json",
+        "design-docs/specs/design-implementation.md",
+        "impl-plans/active/vactr-middle-finalize.md"
+      ],
+      "sharedPaths": [
+        "impl-plans/active/vactr-middle-masks.md",
+        "impl-plans/active/vactr-middle-frontend.md",
+        "impl-plans/active/vactr-middle-check.md",
+        "impl-plans/active/vactr-middle-vm.md",
+        "impl-plans/active/vactr-middle-reactive.md",
+        "impl-plans/active/vactr-middle-pattern.md",
+        "impl-plans/active/vactr-middle-integrate.md"
+      ],
+      "acceptanceCriteria": [
+        "Join integrity is checked against every plan's final-hashes.txt, and each mismatch is explained.",
+        "V1-V13 pass, including crate-wide cargo fmt --check, with logs cited.",
+        "vactr-core.md marks TASK-004/005/006 COMPLETED with every criterion checked and evidenced; an unmet criterion is reported, never checked.",
+        "Module Status, Dependencies, the module sketches, the progress log and the README index are updated.",
+        "The ME plans are marked Completed with archiving noted; the dispatch statuses are set; the FE dispatch closure note is added.",
+        "The commit staging list is recorded (explicit paths; six-section message; no attribution lines)."
+      ],
+      "verification": [
+        "mkdir -p target/fe-logs",
+        "LOG(final-build): CARGO_TERM_QUIET=true cargo build",
+        "LOG(final-clippy): CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings",
+        "LOG(final-nextest): NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run",
+        "LOG(final-cargotest): CARGO_TERM_QUIET=true cargo test",
+        "LOG(final-fixtures): NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 CARGO_TERM_QUIET=true cargo nextest run -E 'binary(spec_fixtures)'",
+        "LOG(final-fmt): CARGO_TERM_QUIET=true cargo fmt --check",
+        "LOG(final-wasm32): CARGO_TERM_QUIET=true cargo build --target wasm32-unknown-unknown",
+        "LOG(final-wasm32-hostwasm): CARGO_TERM_QUIET=true cargo build --target wasm32-unknown-unknown --no-default-features --features host-wasm",
+        "find src tests -name '*.rs' -exec wc -l {} + | sort -n | tail -5",
+        "grep -rnE 'std::(thread|fs|time|net|process)' src/ || echo none",
+        "git diff --stat -- Cargo.toml Cargo.lock",
+        "grep -c 'eval = \"unclassified\"' tests/fixtures/spec/manifest.toml",
+        "jq . impl-plans/completed/fe-frontend-20260925-s165-dispatch.json > /dev/null",
+        "jq . impl-plans/active/me-middle-20260925-s175-dispatch.json > /dev/null",
+        "git status --short"
+      ],
+      "completion": "Completed session 183: join integrity checked (tmp/me-middle-20260925-s175/ME-FINAL/attempt-1/join-integrity.txt, every mismatch explained); target/fe-logs/final-{build,clippy,fmt,nextest,cargotest,fixtures,wasm32,wasm32-hostwasm}-s183-1.log all exit=0 (nextest 489 passed, 1 skipped; cargo test lib 479 + spec_fixtures 10 passed, 1 ignored); vactr-core.md TASK-004..006 bookkeeping done; formal review and the workflow commit pending."
+    }
+  ],
+  "session177Amendment": {
+    "note": "Bounded checkpoint amendment (operator, 2026-09-25). ME-MASKS (wave 1) and ME-FRONTEND (wave 2) were implemented, gate-verified, adversarially reviewed (0 blocking) and accepted by integration review in sessions 175/176 (evidence in their plan progress logs and target/fe-logs/{masks,frontend}-*-s175-*.log). Session-175 then failed on an integration-review output-contract slip, and a rerun from integration-review cannot dispatch (no checkpoint message in its inbox) while a rerun from plan-checkpoint restarts with acceptedPlanIds=[] and would re-dispatch accepted plans. The two accepted plans are therefore REMOVED from this manifest's plans[] and from every dependsOn; their source stays in the working tree (uncommitted, as all wave output) and goes into the single workflow commit. Their plan documents remain in impl-plans/active/ with status Completed/accepted. Session 177 resumes this manifest (no duplicate manifest): workflowExecutionId moves from session-175 to session-177 and originalHead from 51c5af7 (session-175 intake) to dc68308 (session-177 intake, the session-175 plan checkpoint); reviewContext.issueReference.baseCommit stays 51c5af7.",
+    "removedPlans": [
+      {
+        "planId": "ME-MASKS",
+        "planPath": "impl-plans/active/vactr-middle-masks.md",
+        "writePaths": [
+          "src/types/ty.rs",
+          "src/types/masks.rs",
+          "src/types/natives.rs",
+          "src/types/natives_domain.rs",
+          "src/types/diag.rs",
+          "src/vm/fail.rs",
+          "src/types/tests/mod.rs",
+          "src/types/tests/ty.rs",
+          "src/types/tests/masks.rs",
+          "src/types/tests/natives.rs",
+          "impl-plans/active/vactr-middle-masks.md"
+        ]
+      },
+      {
+        "planId": "ME-FRONTEND",
+        "planPath": "impl-plans/active/vactr-middle-frontend.md",
+        "writePaths": [
+          "src/reader/pathlit.rs",
+          "src/reader/lexer.rs",
+          "src/reader/node.rs",
+          "src/reader/sexpr.rs",
+          "src/reader/tests/pathlit.rs",
+          "src/reader/tests/mod.rs",
+          "src/value/value.rs",
+          "src/value/eq.rs",
+          "src/value/print.rs",
+          "src/value/access.rs",
+          "src/value/tests/pathval.rs",
+          "src/value/tests/mod.rs",
+          "impl-plans/active/vactr-middle-frontend.md"
+        ]
+      }
+    ]
+  },
+  "session178Amendment": {
+    "note": "Bounded checkpoint amendment (operator, 2026-09-25). ME-CHECK, ME-VM and ME-PATTERN were implemented, gate-verified, adversarially reviewed (0 blocking each) and accepted by the session-177 integration reviews. Session-177 then failed at dispatch-plans with 'acceptedPlanIds contain unknown plans: ME-FRONTEND, ME-MASKS' because the integration review listed plans that the session-177 amendment had already removed from this manifest. Same recovery as before: the three accepted plans are REMOVED from plans[] and from every dependsOn; their source stays in the working tree and goes into the single workflow commit. ME-REACTIVE (implemented and green in reactive-nextest-s178-1.log, 453/453, but joined without a review verdict because of fanout drift observations) is the next wave, then ME-INTEGRATE, then ME-FINAL. Session 178 resumes this manifest (no duplicate manifest): workflowExecutionId moves from session-177 to session-178 and originalHead from dc68308 to 4a50479 (session-178 intake, the session-177 plan checkpoint); reviewContext.issueReference.baseCommit stays 51c5af7. tests/fixtures/spec/manifest.toml (ME-FRONTEND reader reclassification) is implementation output that depends on the uncommitted reader source, so it is NOT part of this checkpoint and goes into the single workflow commit.",
+    "dispatchContract": "The dispatcher validates acceptedPlanIds against plans[].planId. Integration reviews MUST list in acceptedPlanIds ONLY plans that appear in plans[] of this manifest; plans listed under acceptedOutsideManifest are already accepted and must NOT be named in acceptedPlanIds.",
+    "acceptedOutsideManifest": [
+      "ME-MASKS",
+      "ME-FRONTEND",
+      "ME-CHECK",
+      "ME-VM",
+      "ME-PATTERN",
+      "ME-REACTIVE"
+    ],
+    "removedPlans": [
+      {
+        "planId": "ME-CHECK",
+        "planPath": "impl-plans/active/vactr-middle-check.md",
+        "writePaths": [
+          "src/types/infer.rs",
+          "src/types/unify.rs",
+          "src/types/check.rs",
+          "src/types/scope.rs",
+          "src/types/manifest.rs",
+          "src/types/deps.rs",
+          "src/types/tests/check_basic.rs",
+          "src/types/tests/scope.rs",
+          "src/types/tests/sound.rs",
+          "src/types/tests/diags.rs",
+          "src/types/tests/deps.rs",
+          "src/types/tests/no_abort.rs",
+          "impl-plans/active/vactr-middle-check.md"
+        ],
+        "sharedPaths": [
+          "src/types/mod.rs",
+          "src/types/tests/mod.rs"
+        ]
+      },
+      {
+        "planId": "ME-VM",
+        "planPath": "impl-plans/active/vactr-middle-vm.md",
+        "writePaths": [
+          "src/compile/compiler.rs",
+          "src/compile/matchc.rs",
+          "src/compile/proto.rs",
+          "src/compile/sites.rs",
+          "src/compile/tests/mod.rs",
+          "src/compile/tests/compile.rs",
+          "src/compile/tests/sites.rs",
+          "src/vm/ops.rs",
+          "src/vm/frame.rs",
+          "src/vm/vm.rs",
+          "src/vm/call.rs",
+          "src/vm/natives/mod.rs",
+          "src/vm/natives/num.rs",
+          "src/vm/natives/list.rs",
+          "src/vm/natives/dict.rs",
+          "src/vm/natives/value.rs",
+          "src/vm/natives/console.rs",
+          "src/vm/natives/effects.rs",
+          "src/vm/tests/mod.rs",
+          "src/vm/tests/forcing.rs",
+          "src/vm/tests/query_mode.rs",
+          "src/vm/tests/failures.rs",
+          "src/vm/tests/natives.rs",
+          "src/vm/tests/tweak.rs",
+          "src/ns/namespace.rs",
+          "src/ns/tweak.rs",
+          "src/ns/pkg.rs",
+          "src/ns/stage.rs",
+          "src/ns/tests/mod.rs",
+          "src/ns/tests/namespace.rs",
+          "src/ns/tests/pkg.rs",
+          "src/ns/tests/stage.rs",
+          "impl-plans/active/vactr-middle-vm.md"
+        ],
+        "sharedPaths": [
+          "src/compile/mod.rs",
+          "src/vm/mod.rs",
+          "src/ns/mod.rs"
+        ]
+      },
+      {
+        "planId": "ME-PATTERN",
+        "planPath": "impl-plans/active/vactr-middle-pattern.md",
+        "writePaths": [
+          "src/pattern/pat.rs",
+          "src/pattern/step.rs",
+          "src/pattern/query.rs",
+          "src/pattern/occ.rs",
+          "src/pattern/rng.rs",
+          "src/pattern/signal.rs",
+          "src/pattern/eval.rs",
+          "src/pattern/build.rs",
+          "src/pattern/combinators/mod.rs",
+          "src/pattern/combinators/time.rs",
+          "src/pattern/combinators/structure.rs",
+          "src/pattern/combinators/random.rs",
+          "src/pattern/combinators/region.rs",
+          "src/pattern/combinators/music.rs",
+          "src/pattern/combinators/control.rs",
+          "src/pattern/combinators/input.rs",
+          "src/pattern/combinators/sound.rs",
+          "src/pattern/tests/mod.rs",
+          "src/pattern/tests/steps.rs",
+          "src/pattern/tests/combinators.rs",
+          "src/pattern/tests/random.rs",
+          "src/pattern/tests/region.rs",
+          "src/pattern/tests/cover.rs",
+          "src/pattern/tests/sound.rs",
+          "src/pattern/tests/input.rs",
+          "src/pattern/tests/signals.rs",
+          "src/pattern/tests/faults.rs",
+          "src/pattern/tests/stub_vm.rs",
+          "src/clock/mod.rs",
+          "src/clock/tempo.rs",
+          "src/clock/clock.rs",
+          "src/clock/tests/mod.rs",
+          "src/clock/tests/clock.rs",
+          "src/tex/texnode.rs",
+          "src/tex/shader.rs",
+          "src/tex/uniforms.rs",
+          "src/tex/tests/mod.rs",
+          "src/tex/tests/goldens.rs",
+          "impl-plans/active/vactr-middle-pattern.md"
+        ],
+        "sharedPaths": [
+          "src/lib.rs",
+          "src/pattern/mod.rs",
+          "src/tex/mod.rs"
+        ]
+      }
+    ]
+  },
+  "session179Amendment": {
+    "note": "Bounded checkpoint amendment (operator, 2026-09-25). ME-REACTIVE was accepted in session 178 (adversarial review 0 blocking, integration review accepted). ME-INTEGRATE then implemented and verified green (integrate-nextest-s180-1.log 489/489, cargotest, fixtures, both wasm32 builds exit 0) but its progress gate reported implementation_blocked with a single riela fanout observation: content-or-mode-drift on impl-plans/active/vactr-middle-reactive.md (the ME-REACTIVE attempt-2 progress-log entry written after that branch's snapshot). As a single-branch wave this ended the session as implementation-blocked. Recovery as before: ME-REACTIVE is removed from plans[] and dependsOn; ME-INTEGRATE is re-dispatched on the unchanged tree (review pass), then ME-FINAL. Workers MUST NOT edit plan documents outside their own writePaths/sharedPaths; ME-FINAL owns the cross-plan bookkeeping.",
+    "repairScope": "ME-INTEGRATE attempt-1 left two completion criteria open on repair requests R1 (src/value/dict.rs put must merge a dict element, design 7.1.4 / design-music sound kits) and R2 (src/compile/matchc.rs shape_of must bind a match name that does not name the variant, design 20 Q1) because those files were outside its paths (tmp/me-middle-20260925-s175/ME-INTEGRATE/attempt-1/repair-requests.md). A review-only re-dispatch would block again and leave ME-FINAL unable to check every TASK-004..006 criterion, so the session-179 checkpoint adds both files to ME-INTEGRATE sharedPaths as serial repairs (the plan already makes this wave the serial-repair point; no other plan in plans[] touches them) and ME-INTEGRATE attempt-2 applies them, removes blocked_by/defect_run_fails, and re-verifies. originalHead moves from 4a50479 to f7a937c (session-179 intake, the session-178 plan checkpoint); workflowExecutionId moves to session-179.",
+    "acceptedOutsideManifest": [
+      "ME-MASKS",
+      "ME-FRONTEND",
+      "ME-CHECK",
+      "ME-VM",
+      "ME-PATTERN",
+      "ME-REACTIVE"
+    ],
+    "removedPlans": [
+      {
+        "planId": "ME-REACTIVE",
+        "planPath": "impl-plans/active/vactr-middle-reactive.md",
+        "writePaths": [
+          "src/ns/depgraph.rs",
+          "src/ns/journal.rs",
+          "src/ns/evaluator.rs",
+          "src/ns/load.rs",
+          "src/ns/tests/reactive_basic.rs",
+          "src/ns/tests/reactive_traces.rs",
+          "src/ns/tests/reactive_recovery.rs",
+          "src/ns/tests/rebuild.rs",
+          "src/ns/tests/evaluator.rs",
+          "src/ns/tests/load.rs",
+          "impl-plans/active/vactr-middle-reactive.md"
+        ],
+        "sharedPaths": [
+          "src/ns/mod.rs",
+          "src/ns/tests/mod.rs"
+        ]
+      }
+    ]
+  },
+  "completion": {
+    "date": "2026-09-25",
+    "session": 183,
+    "note": "All eight ME plans completed: ME-MASKS, ME-FRONTEND, ME-CHECK, ME-VM, ME-PATTERN and ME-REACTIVE were accepted outside the manifest (session 177/178/179 amendments), and ME-INTEGRATE and ME-FINAL are completed here. Final combined-tree logs: target/fe-logs/final-<check>-s183-1.log, all exit=0. Plans are marked Completed and move to impl-plans/completed/ after the workflow commit, on user confirmation."
+  },
+  "session180Amendment": {
+    "note": "Bounded checkpoint amendment (operator, 2026-09-25). ME-INTEGRATE was accepted in session 179 (adversarial review 0 blocking, integration review accepted). ME-FINAL implemented its bookkeeping (gate and integrity passed) but its adversarial review output omitted the required findings array, and the redispatch was refused with 'dispatch manifest differs from the committed checkpoint' because ME-FINAL legitimately edited this manifest (status/completion fields). This checkpoint commits that manifest state; ME-INTEGRATE is removed from plans[] as accepted; ME-FINAL is re-dispatched alone for its review pass. Reviewer: the step7 output MUST carry the findings array (empty when none).",
+    "recon184Repair": "Integration review finding RECON-S184-1 (high): the native fanoutJoin failed branch ME-FINAL at step7-adversarial-review (validationRejected: $.findings missing); snapshot sequence tmp/riela-fanout/C129010E-58BC-4A07-9174-1851A02FD806/ ends at 18E43122 (before:step7). Repair per the finding: ME-FINAL is re-dispatched natively on the unchanged tree (plans[].status reset from completed to ready so the dispatcher selects it; its completion note is kept). The reconciler must not repair this in place; integration review decides acceptance. workflowExecutionId moves to session-180 and originalHead from f7a937c to f272536 (the session-179 plan checkpoint). impl-plans/completed/fe-frontend-20260925-s165-dispatch.json (ME-FINAL closure note) is not part of this checkpoint, so this manifest is the only dispatch manifest in the checkpoint; the closure note rides in the single workflow commit.",
+    "acceptedOutsideManifest": [
+      "ME-MASKS",
+      "ME-FRONTEND",
+      "ME-CHECK",
+      "ME-VM",
+      "ME-PATTERN",
+      "ME-REACTIVE",
+      "ME-INTEGRATE"
+    ],
+    "removedPlans": [
+      {
+        "planId": "ME-INTEGRATE",
+        "planPath": "impl-plans/active/vactr-middle-integrate.md"
+      }
+    ]
+  }
+}

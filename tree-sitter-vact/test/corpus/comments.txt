@@ -1,0 +1,22 @@
+==================
+comments and directives
+==================
+# top comment
+#@ top directive
+let value 2 # trailing comment
+let next 3 #@ trailing directive
+---
+
+(source_file
+  (comment)
+  (directive)
+  (statement
+    (identifier)
+    (identifier)
+    (number)
+    (comment))
+  (statement
+    (identifier)
+    (identifier)
+    (number))
+  (directive))

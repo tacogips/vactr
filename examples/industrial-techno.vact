@@ -1,0 +1,24 @@
+# Industrial techno sketch: Peaks FM drum with Mutable Instruments voice
+# adaptations (Plaits FM pair, analog pair, and metallic dual hat).
+# Evaluate the whole file, then re-evaluate individual lines while it plays.
+
+use-bpm 138
+
+# Four-on-the-floor FM kick; alternate pitch and drive for a rough pulse.
+s :phase-drum > note [:c1 :c1 :c1 :c1] > fm-amount 1.8 > pitch-sweep 0.72 > decay 0.32 > drum-noise 0.08 > drive 0.38 > gain 0.95 > d1
+
+# Clipped sounding metallic hit on the backbeat, with a little noisy edge.
+s :phase-drum > note [nil :g2 nil :g2] > fm-amount 2.8 > pitch-sweep 0.35 > decay 0.19 > drum-noise 0.22 > drive 0.5 > gain 0.52 > d2
+
+# Mutable Instruments dual-hat voice: tight offbeats and occasional doubles.
+s :dual-hat-voice > note [nil :a5 :a5 :a5 [nil :a5] :a5 :a5 :a5] > hat-harmonics 0.82 > timbre 0.76 > morph 0.68 > gain 0.25 > d3
+
+# Dark FM bass motif from the Plaits FM pair adaptation.
+s :fm-pair-voice > note [:c2 nil :c2 :eb2 :g1 nil :bb1 :g1] > fm-harmonics 0.78 > timbre {range sine 0.32 0.62} > morph 0.7 > lpg-mode :ping > lpg-decay 0.28 > lpg-color 0.78 > gain 0.42 > d4
+
+# Detuned analog pair stab, answering the bass every other beat.
+s :analog-pair-voice > note [nil :c3 nil :eb3 nil :g2 nil :bb2] > analog-detune 0.72 > timbre 0.68 > morph 0.45 > lpg-mode :ping > lpg-decay 0.18 > lpg-color 0.72 > gain 0.28 > d5
+
+# Sustained industrial drone from the Plaits string model, filtered by its
+# internal voice controls and slowly shifting in timbre.
+s :string-voice > note [:c3] > string-structure 0.78 > string-sustain 0.72 > timbre {range sine 0.25 0.55} > morph 0.66 > gain 0.14 > d6

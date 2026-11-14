@@ -1,0 +1,7 @@
+# Opt-in Plaits voice-layer controls on one FM pair voice.
+inst ping-fm-voice fm-harmonics: float = 0.5 timbre: float = 0.5 morph: float = 0.5 lpg-mode: keyword = :ping lpg-decay: float = 0.4 lpg-color: float = 0.6:
+	let p {fm-pair freq fm-harmonics: fm-harmonics timbre: {0.3 > + {decay-mod lpg-decay: lpg-decay amount: 0.6 target: 0}} morph: morph mode: 0}
+	{p :main} > * amp > + {{p :aux} > * amp > vactrol-gate freq velocity lpg-mode: lpg-mode lpg-decay: lpg-decay lpg-color: lpg-color slot: 10 lane: 1 > aux-out}
+		> vactrol-gate freq velocity lpg-mode: lpg-mode lpg-decay: lpg-decay lpg-color: lpg-color slot: 10 lane: 0
+
+s :ping-fm-voice > note [:a3] > once

@@ -1,0 +1,29 @@
+# Canon in D: Johann Pachelbel (c. 1700, public domain). The eight-chord
+# ground bass loops under three of the canon's entries, one per two cycles.
+# The sounds are new.
+#
+# D  A  Bm  F#m  G  D  G  A: one chord per beat, eight beats = two cycles
+# (4 beats per cycle), so every eight-step list below is played `slow 2`.
+
+use-bpm 60
+
+# the ground bass
+let ground [:d3 :a2 :b2 :fs2 :g2 :d2 :g2 :a2]
+
+# three entries of the upper voice, each two cycles long
+let entry1 [:fs5 :e5 :d5 :cs5 :b4 :a4 :b4 :cs5]
+let entry2 [:d5 :cs5 :b4 :a4 :g4 :fs4 :g4 :e4]
+let entry3 [[:d4 :fs4] [:a4 :g4] [:fs4 :d4] [:fs4 :e4] [:d4 :b3] [:d4 :a4] [:g4 :b4] [:a4 :g4]]
+let violin cat [entry1 entry2 entry3]
+
+# the eight chords; `alt` takes one per cycle, `fast 4` makes it one per beat
+let changes {alt [:d4 :maj] [:a3 :maj] [:b3 :m] [:fs3 :m] [:g3 :maj] [:d4 :maj] [:g3 :maj] [:a3 :maj]}
+
+# bass: round analog sine with a slow release, one note per beat
+s :analog > note ground > slow 2 > wave :sine > release 0.6 > gain 0.6 > d1
+
+# strings pad: the chords voiced close together, slow attack, a wide room
+s :additive > chord changes > fast 4 > voicing > attack 0.25 > release 0.9 > lpf 1800 > room 0.5 > size 0.8 > gain 0.18 > d2
+
+# violin: the three entries in turn (six cycles), then around again
+s :fm > note violin > slow 2 > ratio 1 > index 0.8 > attack 0.05 > release 0.5 > room 0.45 > size 0.8 > gain 0.45 > d3

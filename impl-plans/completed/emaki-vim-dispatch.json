@@ -1,0 +1,215 @@
+{
+  "taskId": "emaki-vim",
+  "workflowMode": "issue-resolution",
+  "workflowExecutionId": "opus-terra-design-and-implement-review-loop-session-839",
+  "implementationBranch": "main",
+  "baseBranch": "main",
+  "remote": "origin",
+  "originalHead": "a998d1eff1229a445dfb264b082edabfe1047c98",
+  "evidenceRoot": "tmp/emaki-vim",
+  "gitPush": false,
+  "designDocPaths": [
+    "design-docs/specs/design-emaki-vim-migration.md",
+    "design-docs/specs/design-emaki.md",
+    "design-docs/user-qa/pending-emaki-questions.md",
+    "design-docs/user-qa/README.md"
+  ],
+  "rules": "impl-plans/active/emaki-vim-00-rules.md",
+  "planIndex": "impl-plans/README.md",
+  "expectedOutcome": "blocked on VMB1/VMB2/VMB4 (VMB3 conditional) unless emaki APIs land or EQ7 scope amendment",
+  "waves": [["EVM-10"], ["EVM-20", "EVM-21"], ["EVM-30"], ["EVM-40"]],
+  "reviewContext": {
+    "issueReference": "No GitHub issue; workflowInput via riela-manager comm-019329; intake comm-019330; design revision comm-019333; design accepted comm-019334; plan comm-019335; plan accepted comm-019336",
+    "userProblem": "vactr editor carries a private vim engine (editor/src/code/vim/**) that duplicates emaki/vim (emaki 9dba0a3 in editor/node_modules/emaki); vactr should consume the engine, keymap schema/presets/compile, KeymapStore and controller from emaki with no user-visible behavior loss.",
+    "requiredOutcomes": [
+      "editor/src/code/vim and editor/test/code/vim deleted; no vactr source imports a local vim engine module; vim features come from emaki/vim.",
+      "vim-mount.ts builds the controller with createVimController and exports createVimHost, createVimOptions and forwardSurfaceUpdates with pinned signatures (VM-D1 to VM-D7, VM-D9).",
+      "TauriKeymapStore implements emaki KeymapStore; browser persistence uses emaki LocalKeymapStore with key vactr.vimKeymap; migrateLegacyActionIds migrates the seven legacy action IDs (VM-D3, VM-D7).",
+      "Solid status/hints/keymap views, clipboard and decorations typed against emaki/vim snapshots (VM-D8).",
+      "Mounted parity oracle editor/test/canvas/vim-parity.test.ts (P1a x2, P1b, P2a, P2b, P3 x5, P4) written at base and never edited later.",
+      "Gates in editor/: npm run check, npx vitest run, npm run build, npm run test:style, npm run e2e:examples, node test/e2e/vim-behavior.mjs, node test/e2e/vim-keymap.mjs; each logged with exit value; failures classified as VMB1-VMB4, BASE-FAIL, NEW-REGRESSION or environment-blocked.",
+      "Behavior parity mapping table from each removed vactr vim module/test to its emaki counterpart or retained vactr integration test; blocker report naming the exact missing emaki APIs."
+    ],
+    "nonGoals": [
+      "Modifying /Users/taco/gits/tacogips/emaki (read-only).",
+      "Re-implementing engine logic in vactr to cover missing emaki APIs.",
+      "Running npm install / npm ci or changing the emaki pin in editor/package.json or package-lock.json.",
+      "Any Rust, Cargo.toml or Cargo.lock change.",
+      "Pushing to the remote."
+    ],
+    "constraints": [
+      "Workers edit only their writePaths; sharedPaths only per sharedPathNotes; no worktrees, no worker commits, no push.",
+      "Evidence logs go under the repository-root tmp/emaki-vim/<planId>/ (from editor/ use ../tmp/emaki-vim/<planId>/); per-attempt subdirectories allowed.",
+      "Heavy runs take the measure lock /Users/taco/gits/tacogips/vactr-worktrees/.measure-lock (rules item 12).",
+      "No assertion may be weakened, skipped or deleted; session.test.ts expect lines stay byte-identical.",
+      "Design section 10 and EQ7 default (a): if VMB1/VMB2/VMB4 remain confirmed-failing, the implementation stays uncommitted and the run reports blocked; this overrides the workflowInput commit instruction."
+    ],
+    "designDecisionsAndRationale": [
+      {"decision": "VM-D1 to VM-D7, VM-D9: rewire vim-mount onto createVimController with a vactr action registry, ex handler for {w,q,wq,x}, render switches off, keymap compile through migrateLegacyActionIds, noteUpdate then blur on a file boundary.", "rationale": "Keeps vactr glue (eval/format/diagnostics/completion actions, file-boundary handling, Solid views) in vactr while the engine comes from emaki/vim."},
+      {"decision": "VM-D8: views consume emaki VimSnapshot (prompt.text, hints, hop null when off).", "rationale": "emaki snapshot replaces local engine state types without changing rendered output."},
+      {"decision": "VM-D10: session.test.ts rebuilt with createVimHost stubs and byte-identical assertions.", "rationale": "Keeps the file-boundary redo regression test as a vactr integration test after engine removal."},
+      {"decision": "Parity oracle EVM-10 written first at base a998d1e and read-only afterwards.", "rationale": "Gives a mounted, engine-independent oracle that detects behavior loss after the rewire."},
+      {"decision": "EVM-40 gate 11 (HEAD must equal a998d1e) is checked as: no committed editor/ change between a998d1e and HEAD.", "rationale": "The plan checkpoint commit (docs, plans, manifest only) moves HEAD past a998d1e; the gate's intent is that workers commit no implementation."},
+      {"decision": "EQ7 default (a): no scope amendment; VMB1, VMB2, VMB4 block completion, VMB3 only if P4 fails.", "rationale": "emaki 9dba0a3 lacks resetDocument/isDocumentBoundary, an ex message return value and a normalizeKey export; emaki is read-only in this run."},
+      {"decision": "Amendment 2026-11-11 round 1: authorize generated build and gate outputs as artifactRoots [tmp/emaki-vim/cargo-target, editor/dist, tmp/ui-style/after, tmp/examples-e2e] for EVM-10 and EVM-40; the wasm release build uses CARGO_TARGET_DIR=tmp/emaki-vim/cargo-target and the editor build uses VACTR_WASM from it, so the shared target/ is not written; rules item 14 is superseded.", "rationale": "Blocked plan EVM-10: base gates 3 to 8 and their rebuild prerequisites were unrun because the generated output paths were not authorized. EVM-40 gets the same contract in advance. The two plans are in waves 1 and 4, so the shared roots never clash. The prior EVM-10 evidence (oracle 11/11, check exit 0) is kept."}
+    ],
+    "intentionalTradeoffs": [
+      "The expected end state is blocked; partial migration remains uncommitted rather than shipping a parity loss.",
+      "P4 may be re-baselined to observed base behavior as documented in EVM-10.",
+      "Wave 2 plans use filtered tsc and targeted vitest only; full gates run in single-plan waves to avoid cross-worker noise."
+    ],
+    "supportedEdgeCases": [
+      "Legacy persisted keymaps with the seven old action IDs migrate on load.",
+      "Document boundary (file load) resets insert/visual mode, dot-repeat and undo ledger (P1, depends on VMB1).",
+      ":w, :q, :wq, :x show the live-sync status message (P3, depends on VMB2).",
+      "User-authored cmdline remaps work in the status prompt (P2, depends on VMB4).",
+      "Meta-key platform shortcuts pass through (P4, VMB3 conditional).",
+      "Missing browser runtime for e2e/style gates is recorded as environment-blocked."
+    ],
+    "outOfScopeEdgeCases": [
+      "Adding missing APIs to emaki.",
+      "Bumping the emaki pin or reinstalling node_modules.",
+      "New vim features beyond current vactr behavior."
+    ],
+    "sourcePaths": [
+      "editor/src/code/vim",
+      "editor/src/code/vim-mount.ts",
+      "editor/src/code/vim-keymap-store.ts",
+      "editor/src/code/vim-clipboard.ts",
+      "editor/src/code/vim-status-view.tsx",
+      "editor/src/code/vim-hints-view.tsx",
+      "editor/src/code/vim-keymap-view.tsx",
+      "editor/src/code/decorations.ts",
+      "editor/src/code/mount.ts",
+      "editor/src/app/main.ts",
+      "editor/src/app/deps.ts",
+      "editor/test/code/vim",
+      "editor/test/canvas",
+      "editor/test/ui/vim-status.test.tsx",
+      "editor/test/documents/session.test.ts",
+      "editor/node_modules/emaki/src/vim"
+    ]
+  },
+  "plans": [
+    {
+      "planId": "EVM-10",
+      "planPath": "impl-plans/active/emaki-vim-10-parity-oracle.md",
+      "dependsOn": [],
+      "writePaths": ["editor/test/canvas/vim-parity.test.ts", "impl-plans/active/emaki-vim-10-parity-oracle.md", "tmp/emaki-vim/EVM-10", "tmp/emaki-vim/cargo-target", "editor/dist", "tmp/ui-style/after", "tmp/examples-e2e"],
+      "sharedPaths": [],
+      "artifactRoots": ["tmp/emaki-vim/cargo-target", "editor/dist", "tmp/ui-style/after", "tmp/examples-e2e"],
+      "acceptanceCriteria": [
+        "editor/test/canvas/vim-parity.test.ts exists with cases P1a (x2), P1b, P2a, P2b, P3 (x5) and P4.",
+        "grep -nE \"code/vim/|emaki/vim|vim-keymap-store\" editor/test/canvas/vim-parity.test.ts returns nothing.",
+        "npx vitest run test/canvas/vim-parity.test.ts exits 0 at base.",
+        "Base gates run with exit values and BASE-FAIL lists recorded under tmp/emaki-vim/EVM-10.",
+        "Progress log updated."
+      ],
+      "verification": [
+        "cd editor && npx vitest run test/canvas/vim-parity.test.ts",
+        "cd editor && npm run check",
+        "cd editor && npx vitest run",
+        "cd editor && npm run build",
+        "cd editor && npm run test:style",
+        "cd editor && npm run e2e:examples",
+        "cd editor && git status --porcelain -- src test"
+      ]
+    },
+    {
+      "planId": "EVM-20",
+      "planPath": "impl-plans/active/emaki-vim-20-keymap-store.md",
+      "dependsOn": ["EVM-10"],
+      "writePaths": ["editor/src/code/vim-keymap-store.ts", "editor/test/code/vim-keymap-store.test.ts", "impl-plans/active/emaki-vim-20-keymap-store.md", "tmp/emaki-vim/EVM-20"],
+      "sharedPaths": [],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "vim-keymap-store.ts exports exactly TauriKeymapStore and migrateLegacyActionIds.",
+        "No MAX_BYTES, VIM_KEYMAP_KEY or KeymapStoreResult left in vim-keymap-store.ts (other than KEYMAP_MAX_BYTES).",
+        "npx vitest run test/code/vim-keymap-store.test.ts exits 0.",
+        "Filtered tsc shows no error lines for the owned files.",
+        "Progress log updated."
+      ],
+      "verification": [
+        "cd editor && npx vitest run test/code/vim-keymap-store.test.ts",
+        "cd editor && npx tsc --noEmit -p . > ../tmp/emaki-vim/EVM-20/tsc.log 2>&1; ! grep -E \"vim-keymap-store\" ../tmp/emaki-vim/EVM-20/tsc.log"
+      ]
+    },
+    {
+      "planId": "EVM-21",
+      "planPath": "impl-plans/active/emaki-vim-21-views-types.md",
+      "dependsOn": ["EVM-10"],
+      "writePaths": ["editor/src/code/vim-status-view.tsx", "editor/src/code/vim-hints-view.tsx", "editor/src/code/vim-keymap-view.tsx", "editor/src/code/vim-clipboard.ts", "editor/src/code/decorations.ts", "editor/test/ui/vim-status.test.tsx", "editor/test/canvas/vim-status-keymap.test.ts", "editor/test/canvas/vim-hints-view.test.ts", "editor/test/canvas/vim-keymap-view.test.ts", "editor/test/code/vim-clipboard.test.ts", "impl-plans/active/emaki-vim-21-views-types.md", "tmp/emaki-vim/EVM-21"],
+      "sharedPaths": [],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "No owned file imports code/vim/ or ./vim/.",
+        "Targeted vitest over the five owned test files exits 0.",
+        "Filtered tsc shows no error lines for any owned file.",
+        "No assertion removed or relaxed; git diff --stat recorded.",
+        "Progress log updated."
+      ],
+      "verification": [
+        "cd editor && npx vitest run test/ui/vim-status.test.tsx test/canvas/vim-status-keymap.test.ts test/canvas/vim-hints-view.test.ts test/canvas/vim-keymap-view.test.ts test/code/vim-clipboard.test.ts",
+        "cd editor && npx tsc --noEmit -p . > ../tmp/emaki-vim/EVM-21/tsc.log 2>&1; ! grep -E \"vim-status-view|vim-hints-view|vim-keymap-view|vim-clipboard|decorations|vim-status\\.test|vim-status-keymap\" ../tmp/emaki-vim/EVM-21/tsc.log",
+        "cd editor && git diff -U0 -- test/ui/vim-status.test.tsx test/canvas/vim-status-keymap.test.ts test/canvas/vim-hints-view.test.ts test/canvas/vim-keymap-view.test.ts test/code/vim-clipboard.test.ts"
+      ]
+    },
+    {
+      "planId": "EVM-30",
+      "planPath": "impl-plans/active/emaki-vim-30-mount-rewire.md",
+      "dependsOn": ["EVM-20", "EVM-21"],
+      "writePaths": ["editor/src/code/vim-mount.ts", "editor/src/app/main.ts", "editor/test/canvas/vim-input.test.ts", "editor/test/canvas/vim-keymap-input.test.ts", "editor/test/canvas/input-vim-hook.test.ts", "editor/test/canvas/input-keymap-hooks.test.ts", "editor/test/canvas/vim-keymap-mount.test.ts", "impl-plans/active/emaki-vim-30-mount-rewire.md", "tmp/emaki-vim/EVM-30"],
+      "sharedPaths": ["editor/src/app/deps.ts", "editor/src/code/mount.ts", "editor/test/canvas/vim-mount.test.ts"],
+      "sharedPathNotes": [
+        {"path": "editor/src/app/deps.ts", "intendedEdit": "Type-import fix only if tsc requires it after VimKeymapDeps.store becomes emaki KeymapStore; no behavior change."},
+        {"path": "editor/src/code/mount.ts", "intendedEdit": "Type-only fix only if tsc requires it for VimMode/VimController types; no behavior change."},
+        {"path": "editor/test/canvas/vim-mount.test.ts", "intendedEdit": "Import-specifier fix only if an import breaks; no assertion edits."}
+      ],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "grep -rnE \"'\\./vim/|code/vim/\" editor/src returns nothing.",
+        "vim-mount.ts exports createVimHost, createVimOptions and forwardSurfaceUpdates with the pinned signatures.",
+        "npm run check exits 0.",
+        "npx vitest run test/canvas failures only in vim-parity.test.ts, each mapped to VMB1-VMB4, plus BASE-FAIL entries.",
+        "No assertion removed or relaxed.",
+        "Progress log updated."
+      ],
+      "verification": [
+        "cd editor && npm run check",
+        "cd editor && npx vitest run test/canvas test/code/vim-keymap-store.test.ts test/ui",
+        "cd editor && npx vitest run test/canvas/vim-parity.test.ts",
+        "cd editor && git diff -U0 -- test/canvas"
+      ]
+    },
+    {
+      "planId": "EVM-40",
+      "planPath": "impl-plans/active/emaki-vim-40-engine-removal.md",
+      "dependsOn": ["EVM-30"],
+      "writePaths": ["editor/src/code/vim", "editor/test/code/vim", "editor/test/documents/session.test.ts", "impl-plans/active/emaki-vim-40-engine-removal.md", "tmp/emaki-vim/EVM-40", "tmp/emaki-vim/cargo-target", "editor/dist", "tmp/ui-style/after", "tmp/examples-e2e"],
+      "sharedPaths": [],
+      "artifactRoots": ["tmp/emaki-vim/cargo-target", "editor/dist", "tmp/ui-style/after", "tmp/examples-e2e"],
+      "acceptanceCriteria": [
+        "editor/src/code/vim and editor/test/code/vim no longer exist; no src/test import of code/vim/ or ./vim/.",
+        "No diff against a998d1e in *.rs, Cargo.toml, Cargo.lock, editor/package.json, editor/package-lock.json; HEAD still a998d1e.",
+        "npm run check and npm run build exit 0.",
+        "Full vitest, test:style, e2e:examples, vim-behavior and vim-keymap e2e run with exit values and logs; failures classified as VMB1-VMB4, BASE-FAIL, NEW-REGRESSION or environment-blocked.",
+        "session.test.ts expect lines unchanged.",
+        "Blocker report complete; overall result stated as blocked or ready-for-finalization; progress log updated."
+      ],
+      "verification": [
+        "cd editor && npm run check",
+        "cd editor && npx vitest run",
+        "cd editor && npm run build",
+        "cd editor && npm run test:style",
+        "cd editor && npm run e2e:examples",
+        "cd editor && node test/e2e/vim-behavior.mjs",
+        "cd editor && node test/e2e/vim-keymap.mjs",
+        "cd editor && ! grep -rnE \"code/vim/|['\\\"]\\./vim/\" src test",
+        "cd editor && test ! -e src/code/vim && test ! -e test/code/vim",
+        "test -z \"$(git diff --stat a998d1e -- '*.rs' Cargo.toml Cargo.lock editor/package.json editor/package-lock.json)\"",
+        "test -z \"$(git diff --name-only a998d1e HEAD -- editor)\"",
+        "cd editor && test -z \"$(git diff -U0 -- test/documents/session.test.ts | grep -E '^[-+].*expect\\(')\""
+      ]
+    }
+  ]
+}

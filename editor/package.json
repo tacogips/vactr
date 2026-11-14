@@ -1,0 +1,44 @@
+{
+  "name": "vactr-editor",
+  "version": "0.1.2",
+  "private": true,
+  "type": "module",
+  "description": "Vactr editor: browser and Tauri frontend speaking Session Protocol v1",
+  "engines": {
+    "node": "^22.23.4 || ^24.22.1 || ^26.12.1"
+  },
+  "scripts": {
+    "check": "tsc --noEmit",
+    "test": "vitest run",
+    "test:perf": "VACTR_PERF=1 vitest run --maxWorkers=1",
+    "test:style": "node test/style/ui-style.mjs",
+    "build": "vite build",
+    "dev": "vite",
+    "e2e": "node test/e2e/run.mjs",
+    "e2e:examples": "node test/e2e/examples.mjs",
+    "e2e:header": "node test/e2e/header.mjs",
+    "e2e:background": "node test/e2e/background.mjs"
+  },
+  "dependencies": {
+    "@codemirror/commands": "6.11.1",
+    "@codemirror/language": "6.12.4",
+    "@codemirror/lint": "6.9.7",
+    "@codemirror/state": "6.7.6",
+    "@codemirror/view": "6.43.13",
+    "@lezer/highlight": "1.2.4",
+    "@tauri-apps/api": "2.11.1",
+    "@tauri-apps/plugin-dialog": "2.7.3",
+    "@tauri-apps/plugin-fs": "2.5.2",
+    "emaki": "github:tacogips/emaki#d6f860922f1ae0959c64e43ec32f3a54f511495a",
+    "solid-js": "1.9.15",
+    "web-tree-sitter": "0.27.0"
+  },
+  "devDependencies": {
+    "jsdom": "30.1.1",
+    "playwright": "1.62.1",
+    "typescript": "7.0.2",
+    "vite": "8.3.1",
+    "vite-plugin-solid": "2.11.14",
+    "vitest": "5.0.2"
+  }
+}

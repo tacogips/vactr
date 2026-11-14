@@ -1,0 +1,73 @@
+/* The package pane (design 15.1.10). */
+
+.pkg-pane {
+  display: flex;
+  flex-direction: column;
+  gap: var(--vt-space-2);
+  padding: var(--vt-space-2) var(--vt-space-3);
+  border-top: var(--vt-border-w) solid var(--vt-border);
+  font-size: var(--vt-text-sm);
+}
+
+.pkg-title {
+  font-size: var(--vt-text-xs);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--vt-text-muted);
+}
+
+.pkg-proxy {
+  display: flex;
+  flex-direction: column;
+  gap: var(--vt-space-1);
+  color: var(--vt-text-muted);
+}
+
+.pkg-proxy input {
+  width: 100%;
+  box-sizing: border-box;
+  font: inherit;
+  padding: 0 var(--vt-space-2);
+  border: var(--vt-border-w) solid var(--vt-border-strong);
+  background: var(--vt-bg-sunken);
+  color: var(--vt-text);
+}
+
+.pkg-hint {
+  color: var(--vt-warn);
+}
+
+.pkg-imports,
+.pkg-diagnostics {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.pkg-imports li {
+  display: flex;
+  align-items: center;
+  gap: var(--vt-space-2);
+  min-height: var(--vt-control-h);
+}
+
+.pkg-path {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pkg-imports code {
+  user-select: all;
+  font-family: var(--vt-font-mono);
+}
+
+.pkg-diagnostics li {
+  color: var(--vt-danger);
+}
+
+.pkg-status {
+  color: var(--vt-text-muted);
+}

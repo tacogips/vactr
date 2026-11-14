@@ -1,0 +1,7 @@
+let x 1
+			# stray
+inst x:
+	let y 1
+    # c
+next
+let z 2 # trailing   

@@ -1,0 +1,215 @@
+{
+  "taskId": "cmp-closeout",
+  "workflowMode": "issue-resolution",
+  "implementationBranch": "wf/syntax-fmt",
+  "baseBranch": "wf/syntax-fmt",
+  "remote": "origin",
+  "originalHead": "a61fc2ea21c1f3ff824392e3efd55a49e09141f7",
+  "designDocPaths": [
+    "design-docs/specs/design-completion.md",
+    "design-docs/specs/design-formatter-and-syntax.md",
+    "design-docs/user-qa/pending-completion-questions.md"
+  ],
+  "planIndexPath": "impl-plans/README.md",
+  "evidenceRoot": "tmp/cmp-closeout",
+  "evidenceLayout": "tmp/cmp-closeout/CMP-40/attempt-<n>/ holds one full log per verification command, each ending with an exit=<status> line. The Progress Log of impl-plans/active/cmp-40-closeout.md records every command, its exit status and its log path. tmp/ is gitignored and never listed in writePaths. A missing or truncated log is not a pass. A step blocked by the sandbox (network, ~/.cache/tree-sitter, localhost, full nextest, .git writes) is recorded as BLOCKED with the command, exit code and stderr; the orchestrator reruns it before commit.",
+  "executionModel": {
+    "waves": [
+      ["CMP-40"]
+    ],
+    "sameBranchFanout": true,
+    "worktrees": false,
+    "workersMayChangeGitState": false,
+    "commitOwner": "The orchestrator commits the accepted implementation, the CMP-40 docs and the plan archive after review, with an AGENTS.md 1-6 section commit message and no tool attribution. Workers never commit, stash, checkout, reset, branch, push or merge. Only wf/syntax-fmt is pushed; never main.",
+    "retryPolicy": "CMP-40 runs alone. If cargo reports a build-directory lock, wait about 60 s and retry, up to 10 times, then record a blocker. Never run npm install; do not change package.json, package-lock.json, Cargo.toml or Cargo.lock.",
+    "editProtocol": "Before each edit, re-read the file and record its sha256 and a one-line intent snapshot in the CMP-40 Progress Log. After the edit, record the post-edit sha256. If the file drifted from the last recorded hash, stop and report. Never edit outside writePaths, except a sharedPath under a recorded material finding (Task 2). Formatting is limited to rustfmt on a single repaired .rs file (never `cargo fmt` without --check).",
+    "serialReconciliation": "CMP-40 is the serial reconciliation: it owns README.md, impl-plans/README.md, plan archiving, the two design status sentences and the full gate. cmp-dispatch.json is the session-226 record: it is moved unchanged to impl-plans/completed/ and is never dispatched again. This manifest stays in impl-plans/active/."
+  },
+  "reviewContext": {
+    "issueReference": "workflowInput closeout of opus-luna-design-and-implement-review-loop-session-226 (no GitHub issue number); upstream tacogips/riela#128; current run opus-luna-design-and-implement-review-loop-session-234; design accepted in comm-003003 (step3-design-review)",
+    "userProblem": "The completion engine, tree-sitter span core, format core split, VACTR_WASM loader fix and formatter space-indent repair were implemented and accepted in session 226 but remain uncommitted, because the CMP-40 closeout dispatch failed on a directory-based manifest (riela#128).",
+    "requiredOutcomes": [
+      "A combined integration review of all changes since a61fc2e against design-completion.md and design-formatter-and-syntax.md, with minimal re-verified repairs for material findings only.",
+      "The full gate of design-completion.md section 9 passes with positive nextest (plain and --features lsp) and vitest counts.",
+      "README.md documents completion (LSP and editor), the tree-sitter span core and the space-indent repair; the two design status sentences say Implemented and verified.",
+      "The 12 cmp/eds/fst-50 plans are marked Completed and, with cmp-dispatch.json, moved to impl-plans/completed/; impl-plans/README.md is updated."
+    ],
+    "nonGoals": [
+      "Redesign or re-implementation of any accepted plan.",
+      "@codemirror/autocomplete or any new npm or crate dependency.",
+      "Edits to editor/src/app/apis.ts or editor/src/code/language.ts.",
+      "Edits to cmp-dispatch.json or to this manifest."
+    ],
+    "designDecisionsAndRationale": [
+      "Closeout only, no design change (design-completion.md section 8, closeout paragraph).",
+      "Accepted plans go in acceptedDependencies so they count as satisfied and are not re-implemented.",
+      "Concrete files only, so the fanout snapshot stays far below 512 entries."
+    ],
+    "intentionalTradeoffs": [
+      "The accepted session-226 implementation is adopted as is; only material integration findings (gate failure, design rule violation, cross-plan contract mismatch) are repaired, style notes are recorded only.",
+      "This manifest stays in impl-plans/active/ after the archive, and its acceptedDependencies planPaths keep the impl-plans/active/ paths mandated by workflowInput; it is a historical record and is never dispatched again.",
+      "Sandbox-blocked gate steps (full nextest, .git writes, localhost, network) are recorded as BLOCKED and rerun by the orchestrator before commit instead of being reported as passed."
+    ],
+    "supportedEdgeCases": [
+      "LSP completion stays a superset of the old Analysis::complete sources; a ranking change is not a finding, only a dropped candidate is.",
+      "wasm completion ranges are UTF-8 bytes on the wire and UTF-16 after the editor service mapping.",
+      "Space-indent repair accepts only files whose sole reader errors are indent-space with one indent unit dividing every leading-space width and a clean re-read; ambiguous, mixed and other-error files are returned byte-identical."
+    ],
+    "outOfScopeEdgeCases": [
+      "Merge conflicts with the main canvas-editor plans J1 (code/mount.ts), C1 (app/deps.ts) and app/main.ts are noted in impl-plans/README.md, not resolved here.",
+      "Canvas GPU rendering of completion or tree-sitter spans (owned by canvas plan S3/J1 on main).",
+      "Any new completion source, signature-help redesign or ranking change beyond the accepted plans."
+    ],
+    "constraints": [
+      "Work only on wf/syntax-fmt in this worktree; push only wf/syntax-fmt, never main.",
+      "AGENTS.md: English only, no emojis, Rust files under 1000 lines, CARGO_TERM_QUIET=true for cargo.",
+      "Manifest paths are concrete tracked files only; never directories, target/, editor/node_modules, editor/dist, tree-sitter-vact/node_modules or tmp/."
+    ],
+    "sourcePaths": [
+      "editor/src/code/language.ts",
+      "editor/src/app/apis.ts",
+      "editor/test/support/wasm.ts"
+    ]
+  },
+  "acceptedDependencies": [
+    {"planId": "CMP-10", "planPath": "impl-plans/active/cmp-10-complete-core.md"},
+    {"planId": "CMP-15", "planPath": "impl-plans/active/cmp-15-completion-types.md"},
+    {"planId": "FST-50", "planPath": "impl-plans/active/fst-50-fmt-space-repair.md"},
+    {"planId": "EDS-10", "planPath": "impl-plans/active/eds-10-syntax-span-core.md"},
+    {"planId": "EDS-11", "planPath": "impl-plans/active/eds-11-wasm-format-loader.md"},
+    {"planId": "EDS-12", "planPath": "impl-plans/active/eds-12-format-core-tool-wasm.md"},
+    {"planId": "CMP-20", "planPath": "impl-plans/active/cmp-20-complete-lsp.md"},
+    {"planId": "CMP-21", "planPath": "impl-plans/active/cmp-21-complete-wasm.md"},
+    {"planId": "CMP-30", "planPath": "impl-plans/active/cmp-30-completion-service.md"},
+    {"planId": "CMP-31", "planPath": "impl-plans/active/cmp-31-completion-popup.md"},
+    {"planId": "CMP-32", "planPath": "impl-plans/active/cmp-32-completion-view-wiring.md"}
+  ],
+  "plans": [
+    {
+      "planId": "CMP-40",
+      "planPath": "impl-plans/active/cmp-40-closeout.md",
+      "acceptanceCriteria": [
+        "Task 1: git diff --name-only a61fc2e lists exactly the 30 expected paths and git ls-files --others --exclude-standard lists exactly the 40 expected paths; apis.ts/language.ts are unchanged; no @codemirror/autocomplete; every .rs file is under 1000 lines.",
+        "Task 2 items 1-6 are each recorded OK, or repaired minimally and re-verified.",
+        "Gate steps 1-12 exit 0, each with a complete log, and the nextest, vitest and budget-median results are recorded; any BLOCKED step is listed with its evidence.",
+        "README, impl-plans/README.md and the two design status sentences are updated per Task 4.",
+        "The 13 files are in impl-plans/completed/, the 12 plans say Completed, impl-plans/active/ keeps only cmp-closeout-dispatch.json of the cmp/eds/fst-50 names, and the stale-link grep is clean.",
+        "The Progress Log is updated."
+      ],
+      "dependsOn": [],
+      "writePaths": [
+        "README.md",
+        "impl-plans/README.md",
+        "design-docs/specs/design-completion.md",
+        "design-docs/specs/design-formatter-and-syntax.md",
+        "impl-plans/active/cmp-10-complete-core.md",
+        "impl-plans/active/cmp-15-completion-types.md",
+        "impl-plans/active/cmp-20-complete-lsp.md",
+        "impl-plans/active/cmp-21-complete-wasm.md",
+        "impl-plans/active/cmp-30-completion-service.md",
+        "impl-plans/active/cmp-31-completion-popup.md",
+        "impl-plans/active/cmp-32-completion-view-wiring.md",
+        "impl-plans/active/cmp-40-closeout.md",
+        "impl-plans/active/eds-10-syntax-span-core.md",
+        "impl-plans/active/eds-11-wasm-format-loader.md",
+        "impl-plans/active/eds-12-format-core-tool-wasm.md",
+        "impl-plans/active/fst-50-fmt-space-repair.md",
+        "impl-plans/active/cmp-dispatch.json",
+        "impl-plans/completed/cmp-10-complete-core.md",
+        "impl-plans/completed/cmp-15-completion-types.md",
+        "impl-plans/completed/cmp-20-complete-lsp.md",
+        "impl-plans/completed/cmp-21-complete-wasm.md",
+        "impl-plans/completed/cmp-30-completion-service.md",
+        "impl-plans/completed/cmp-31-completion-popup.md",
+        "impl-plans/completed/cmp-32-completion-view-wiring.md",
+        "impl-plans/completed/cmp-40-closeout.md",
+        "impl-plans/completed/eds-10-syntax-span-core.md",
+        "impl-plans/completed/eds-11-wasm-format-loader.md",
+        "impl-plans/completed/eds-12-format-core-tool-wasm.md",
+        "impl-plans/completed/fst-50-fmt-space-repair.md",
+        "impl-plans/completed/cmp-dispatch.json"
+      ],
+      "sharedPaths": [
+        "src/lib.rs",
+        "src/cli/tests/fmt.rs",
+        "src/fmt/mod.rs",
+        "src/fmt/tests/mod.rs",
+        "src/fmt/tests/mutation.rs",
+        "src/host/wasm/mod.rs",
+        "src/lsp/analysis.rs",
+        "src/lsp/server.rs",
+        "src/lsp/tests/analysis.rs",
+        "src/lsp/tests/mod.rs",
+        "src/complete/mod.rs",
+        "src/complete/context.rs",
+        "src/complete/rank.rs",
+        "src/complete/scope.rs",
+        "src/complete/sources.rs",
+        "src/complete/tests/mod.rs",
+        "src/complete/tests/context.rs",
+        "src/complete/tests/rank.rs",
+        "src/complete/tests/robust.rs",
+        "src/complete/tests/scope.rs",
+        "src/fmt/repair.rs",
+        "src/fmt/tests/repair.rs",
+        "src/host/wasm/complete_abi.rs",
+        "src/lsp/tests/complete.rs",
+        "src/fmt/tests/fixtures/space2.in",
+        "src/fmt/tests/fixtures/space2.out",
+        "src/fmt/tests/fixtures/space4.in",
+        "src/fmt/tests/fixtures/space4.out",
+        "src/fmt/tests/fixtures/space-ambiguous.in",
+        "src/fmt/tests/fixtures/space-ambiguous.out",
+        "src/fmt/tests/fixtures/space-mixed-lines.in",
+        "src/fmt/tests/fixtures/space-mixed-lines.out",
+        "src/fmt/tests/fixtures/space-other-error.in",
+        "src/fmt/tests/fixtures/space-other-error.out",
+        "editor/src/app/deps.ts",
+        "editor/src/app/main.ts",
+        "editor/src/code/format.ts",
+        "editor/src/code/mount.ts",
+        "editor/src/code/syntax.ts",
+        "editor/test/code/format.test.ts",
+        "editor/test/wasm/format.test.ts",
+        "editor/src/code/completion.ts",
+        "editor/src/code/completion-types.ts",
+        "editor/src/code/completion-popup.ts",
+        "editor/src/code/completion-view.ts",
+        "editor/src/code/format-core.ts",
+        "editor/src/code/syntax-core.ts",
+        "editor/src/code/tool-wasm.ts",
+        "editor/test/code/completion.test.ts",
+        "editor/test/code/completion-types.test.ts",
+        "editor/test/code/completion-popup.test.ts",
+        "editor/test/code/completion-view.test.ts",
+        "editor/test/code/syntax-core.test.ts",
+        "editor/test/code/tool-wasm.test.ts",
+        "editor/test/wasm/complete.test.ts",
+        "editor/test/wasm/completion-engine.test.ts"
+      ],
+      "sharedPathNotes": [
+        {"path": "design-docs/specs/design-completion.md", "intendedEdit": "Header Status sentence only (Design -> Implemented and verified 2026-09-30 (session 234) with counts)."},
+        {"path": "design-docs/specs/design-formatter-and-syntax.md", "intendedEdit": "The session-226 amendment status sentence only."},
+        {"path": "impl-plans/active/cmp-dispatch.json", "intendedEdit": "Moved unchanged to impl-plans/completed/cmp-dispatch.json; never edited or dispatched."},
+        {"path": "src/lsp/analysis.rs", "intendedEdit": "Read-only unless Task 2 records a material finding; then a minimal edit with pre/post sha256, and the same rule applies to every sharedPath."}
+      ],
+      "verification": [
+        "git diff --name-only a61fc2e",
+        "git ls-files --others --exclude-standard",
+        "CARGO_TERM_QUIET=true cargo build",
+        "CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings",
+        "CARGO_TERM_QUIET=true cargo clippy --all-targets --features lsp -- -D warnings",
+        "CARGO_TERM_QUIET=true cargo fmt --check",
+        "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run",
+        "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run --features lsp",
+        "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run --release --run-ignored only -E 'test(budget)'",
+        "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm",
+        "mise run ts-build-wasm",
+        "mise run ts-test",
+        "mise run fmt-vact-check",
+        "mise run lint",
+        "cd editor && npm run check && npm test && npm run build"
+      ]
+    }
+  ]
+}

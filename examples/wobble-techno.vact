@@ -1,0 +1,9 @@
+# Tempo-locked wobble techno at 136 BPM.
+use-bpm 136
+
+# Four-on-the-floor kick with restrained high percussion.
+s :phase-drum > note [:c1 :c1 :c1 :c1] > fm-amount 1.5 > pitch-sweep 0.7 > decay 0.32 > gain 0.3 > d1
+s :dual-hat-voice > note [nil :a5 nil :a5 nil :a5 nil :a5] > hat-harmonics 0.72 > timbre 0.68 > morph 0.6 > gain 0.07 > d2
+
+# Long synced bass notes alternate 1/8 and 1/8-triplet wobble divisions.
+s :wobble-bass > note [:c1] > gate-length 16 > lfo-rate {alt 8 12} > lfo-depth 0.72 > cutoff 190 > gain 0.27 > d3

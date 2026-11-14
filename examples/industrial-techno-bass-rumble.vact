@@ -1,0 +1,88 @@
+# Bass-forward industrial techno preset: Peaks FM drum with Mutable Instruments voice
+# adaptations (Plaits FM pair, analog pair, string, and metallic dual hat).
+# First four bars expose the bass; kick and kick-derived rumble then enter.
+# Play 16 cycles to hear the bass introduction and full industrial groove.
+# Eight parts: dry kick, backbeat, metal hits, ducked bass, stabs, texture,
+# ducked kick-derived rumble, and long metal accents. A fill changes every fourth bar.
+
+# Declare the voices locally so the checker and sound resolver both know them.
+inst industrial-drum fm-amount: float = 1.5 pitch-sweep: float = 0.5 decay: float = 0.4 drum-noise: float = 0 drive: float = 0:
+	fm-drum freq fm-amount: fm-amount pitch-sweep: pitch-sweep decay: decay drum-noise: drum-noise drive: drive
+		> * amp
+
+inst industrial-hat hat-harmonics: float = 0.5 timbre: float = 0.5 morph: float = 0.5 hat-sustain: float = 0 lpg-mode: keyword = :off lpg-decay: float = 0.5 lpg-color: float = 0.5:
+	hat-pair-core freq hat-harmonics: hat-harmonics timbre: timbre morph: morph velocity: velocity mode: 0 hat-sustain: hat-sustain > * amp
+		> + {hat-pair-core freq hat-harmonics: hat-harmonics timbre: timbre morph: morph velocity: velocity mode: 1 hat-sustain: hat-sustain > * amp > vactrol-gate freq velocity lpg-mode: lpg-mode lpg-decay: lpg-decay lpg-color: lpg-color slot: 23 lane: 1 > aux-out}
+		> vactrol-gate freq velocity lpg-mode: lpg-mode lpg-decay: lpg-decay lpg-color: lpg-color slot: 23 lane: 0
+
+inst industrial-bass fm-harmonics: float = 0.5 timbre: float = 0.5 morph: float = 0.5 lpg-mode: keyword = :off lpg-decay: float = 0.5 lpg-color: float = 0.5:
+	let p {fm-pair freq fm-harmonics: fm-harmonics timbre: timbre morph: morph mode: 0}
+	{p :main} > * amp > + {{p :aux} > * amp > vactrol-gate freq velocity lpg-mode: lpg-mode lpg-decay: lpg-decay lpg-color: lpg-color slot: 10 lane: 1 > aux-out}
+		> vactrol-gate freq velocity lpg-mode: lpg-mode lpg-decay: lpg-decay lpg-color: lpg-color slot: 10 lane: 0
+
+inst industrial-stab analog-detune: float = 0.5 timbre: float = 0.5 morph: float = 0.5 lpg-mode: keyword = :off lpg-decay: float = 0.5 lpg-color: float = 0.5:
+	let p {analog-pair-core freq analog-detune: analog-detune timbre: timbre morph: morph mode: 0}
+	{p :main} > * amp > + {{p :aux} > * amp > vactrol-gate freq velocity lpg-mode: lpg-mode lpg-decay: lpg-decay lpg-color: lpg-color slot: 8 lane: 1 > aux-out}
+		> vactrol-gate freq velocity lpg-mode: lpg-mode lpg-decay: lpg-decay lpg-color: lpg-color slot: 8 lane: 0
+
+inst industrial-texture string-structure: float = 0.5 timbre: float = 0.5 morph: float = 0.5 string-sustain: float = 0 lpg-mode: keyword = :off lpg-decay: float = 0.5 lpg-color: float = 0.5:
+	string-pair-core freq string-structure: string-structure timbre: timbre morph: morph velocity: velocity mode: 0 string-sustain: string-sustain > * amp
+		> + {string-pair-core freq string-structure: string-structure timbre: timbre morph: morph velocity: velocity mode: 1 string-sustain: string-sustain > * amp > vactrol-gate freq velocity lpg-mode: lpg-mode lpg-decay: lpg-decay lpg-color: lpg-color slot: 19 lane: 1 > aux-out}
+		> vactrol-gate freq velocity lpg-mode: lpg-mode lpg-decay: lpg-decay lpg-color: lpg-color slot: 19 lane: 0
+		> shimmer-reverb size: 0.58 decay: 5 damping: 0.48 shift: 12 feedback: 0.32 mix: 0.2
+
+use-bpm 138
+
+# Persistent buses: the actual dry kick keys both rumble and pitched bass.
+# Set either keyed compressor's mix to 0 to hear the unducked version.
+bus :kick:
+	gain 0
+
+bus :rumble:
+	plate size: 0.68 decay: 1.8 damping: 0.72 predelay: 0.025 mix: 1
+		> saturate drive: 18 tone: 500 output: -8
+		> hpf cutoff: 35
+		> lpf cutoff: 300
+		> compressor sidechain: :kick threshold: -22 ratio: 8 attack: 0.002 release: 0.12 knee: 4 makeup: 0 mix: 1
+
+# Shorter release on the melodic bass leaves space between kick attacks.
+bus :bass:
+	hpf cutoff: 35 > lpf cutoff: 1600
+		> saturate drive: 9 tone: 1800 output: -4
+		> compressor sidechain: :kick threshold: -18 ratio: 4 attack: 0.002 release: 0.07 knee: 4 makeup: 0 mix: 1
+
+# Distorted metal with independently tuned body modes and a short dispersive spring.
+bus :metal:
+	saturate drive: 12 tone: 6800 output: -9
+		> parametric-resonator freq-1: 740 decay-1: 0.45 gain-1: 6 freq-2: 1174 decay-2: 0.32 gain-2: 3 freq-3: 1865 decay-3: 0.24 gain-3: 0 freq-4: 2960 decay-4: 0.16 gain-4: -3 mix: 0.15
+		> spring-reverb length: 0.032 tension: 0.68 dispersion: 0.72 decay: 1.3 loss: 0.48 drive: 1.6 mix: 0.18
+		> compressor threshold: -15 ratio: 3 attack: 0.008 release: 0.09 knee: 4 makeup: 1
+
+master:
+	compressor threshold: -10 ratio: 2 attack: 0.025 release: 0.12 knee: 6 makeup: 0
+		> limiter ceiling: -1 release: 0.06
+
+# Share the kick pattern between dry and wet feeds. Rumble is a reverberant
+# copy of this kick, not a separate offbeat bass drum.
+let kick s :industrial-drum > note [:g1 :g1 :g1 :g1] > fm-amount 7 > pitch-sweep 2.6 > decay 0.24 > drum-noise 0.025 > drive 0.42
+kick > gain {slow [0 0.82 0.82 0.82] 16} > bus :kick > d1
+kick > gain {slow [0 1.15 1.15 1.15] 16} > bus :rumble > d7
+
+# Heavy, noisy FM backbeat with a short double at the end of every fourth bar.
+s :industrial-drum > note [nil :g3 nil {alt [:g3 nil] [:g3 nil] [:g3 nil] [:g3 :ab3]}] > fm-amount 11 > pitch-sweep 1.4 > decay 0.17 > drum-noise 0.62 > drive 0.75 > hpf 400 > lpf 5200 > room 0.16 > size 0.42 > gain {slow [0 0.32 0.32 0.32] 16} > d2
+
+# Fewer, darker metal hits: deliberately avoid a constant light hat tick.
+s :industrial-hat > note [nil nil :a4 nil nil :a4 nil [:a4 :a4]] > hat-harmonics 0.9 > timbre 0.38 > morph 0.42 > hpf 1100 > lpf 8200 > gain {slow [0 0.2 0.2 0.2] 16} > pan 0.43 > bus :metal > d3
+
+# G/Ab/F gives the bass a tense, narrow motif. Overlapping note tails are
+# compressed by the kick bus, rather than ducked with a preset beat curve.
+s :industrial-bass > note [nil nil :g1 :g1 nil nil :g1 :ab1 nil nil :g1 :g1 nil nil :f2 :g1] > fm-harmonics 0.58 > timbre {range sine 0.3 0.48} > morph 0.58 > lpg-mode :ping > lpg-decay 0.32 > lpg-color 0.68 > gain 0.4 > bus :bass > d4
+
+# Sparse detuned stabs with a dotted-eighth echo (0.326 s at 138 BPM).
+s :industrial-stab > note [nil nil :g3 nil nil :ab3 nil :f3] > analog-detune 0.7 > timbre {range sine 0.4 0.64} > morph 0.38 > lpg-mode :ping > lpg-decay 0.13 > lpg-color 0.66 > hpf 320 > lpf 4200 > delay 0.16 > delaytime 0.326 > delayfeedback 0.28 > pan 0.58 > gain {slow [0 0.17 0.17 0.17] 16} > d5
+
+# Bowed-metal tension with quiet octave-up feedback shimmer, one trigger every four bars.
+s :industrial-texture > note [:g3] > slow 4 > string-structure 0.86 > string-sustain 0.6 > timbre {range sine 0.3 0.58} > morph 0.72 > hpf 700 > lpf 4800 > room 0.45 > size 0.78 > pan {range sine 0.3 0.7} > gain {slow [0 0.065 0.065 0.065] 16} > d6
+
+# A lower, longer metallic accent every half bar, rather than four open hats.
+s :industrial-hat > note [nil :a4] > hat-harmonics 0.96 > timbre 0.48 > morph 0.8 > hpf 1500 > lpf 7600 > room 0.18 > size 0.42 > pan 0.62 > gain {slow [0 0.17 0.17 0.17] 16} > bus :metal > d8

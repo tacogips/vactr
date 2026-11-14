@@ -1,0 +1,160 @@
+import type { CodeRect, CodeRange } from '../app/apis';
+import { RESOURCE_LIMITS } from './resources';
+
+export interface TextMetricsSource { font: string; measureText(text: string): { width: number } }
+export interface LayoutFont { font: string; fallback?: string; generation?: number; lineHeight: number; baseline: number }
+export interface LayoutViewport { width: number; height: number; scrollLeft: number; scrollTop: number; left?: number; top?: number; gutter?: number }
+export interface ShapedRun { text: string; from: number; to: number; x: number; width: number }
+export interface ShapedLine { number: number; from: number; to: number; runs: readonly ShapedRun[]; width: number; rtlUnsupported: boolean }
+interface LineIndex { from: number; to: number; next: number }
+const rtl = /[\u0590-\u08ff\ufb1d-\ufdff\ufe70-\ufeff]/u;
+const segmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
+
+/** No per-character geometry arrays: huge lines are measured lazily, drawn as cropped run tiles. */
+export class TextLayout {
+  private source = '';
+  private lines: LineIndex[] = [{ from: 0, to: 0, next: 0 }];
+  private cache = new Map<number, { line: ShapedLine; bytes: number }>();
+  private bytes = 0;
+  private readonly cacheLimit: number;
+  readonly stats = { builds: 0, evictions: 0 };
+  constructor(private metrics: TextMetricsSource, public font: LayoutFont, cacheLimit = RESOURCE_LIMITS.layout) {
+    this.cacheLimit = Math.min(RESOURCE_LIMITS.layout, Math.max(0, cacheLimit));
+    this.validateFont(font);
+  }
+  get document(): string { return this.source; }
+  get lineCount(): number { return this.lines.length; }
+  get cacheBytes(): number { return this.bytes; }
+  setDocument(text: string): void {
+    if (text === this.source) return;
+    const previous = this.source; const previousLines = this.lines;
+    this.source = text; this.lines = [];
+    let from = 0;
+    for (const match of text.matchAll(/\r\n|\r|\n/g)) {
+      const to = match.index!; const next = to + match[0].length;
+      this.lines.push({ from, to, next }); from = next;
+    }
+    this.lines.push({ from, to: text.length, next: text.length });
+    // Keep unchanged shaped runs by identity; edits invalidate only changed lines.
+    for (const [n, entry] of this.cache) {
+      const before = previousLines[n], after = this.lines[n];
+      if (!before || !after || before.from !== after.from || before.to !== after.to || previous.slice(before.from, before.to) !== text.slice(after.from, after.to)) {
+        this.bytes -= entry.bytes; this.cache.delete(n);
+      }
+    }
+  }
+  setFont(font: LayoutFont): void {
+    this.validateFont(font);
+    if (JSON.stringify(font) === JSON.stringify(this.font)) return;
+    this.font = font; this.invalidate();
+  }
+  invalidate(): void { this.cache.clear(); this.bytes = 0; }
+  private validateFont(font: LayoutFont): void {
+    if (!font.font || !Number.isFinite(font.lineHeight) || font.lineHeight <= 0 || !Number.isFinite(font.baseline) || font.baseline < 0 || font.baseline > font.lineHeight) throw new RangeError('Invalid layout font');
+  }
+  shape(number: number): ShapedLine {
+    const hit = this.cache.get(number);
+    if (hit) { this.cache.delete(number); this.cache.set(number, hit); return hit.line; }
+    const index = this.lines[number];
+    if (!index) throw new RangeError('Line outside document');
+    this.metrics.font = this.font.font;
+    const runs: ShapedRun[] = []; const stop = Math.max(1, this.metrics.measureText(' ').width * 4);
+    let x = 0; let from = index.from;
+    while (from < index.to) {
+      const tab = this.source.indexOf('\t', from);
+      const to = tab < 0 ? index.to : Math.min(tab, index.to);
+      if (to > from) {
+        const text = this.source.slice(from, to); const width = this.metrics.measureText(text).width;
+        runs.push({ text, from, to, x, width }); x += width;
+      }
+      if (to === index.to) break;
+      x = (Math.floor(x / stop) + 1) * stop; from = to + 1;
+    }
+    const line: ShapedLine = { number, from: index.from, to: index.to, runs, width: x, rtlUnsupported: rtl.test(this.source.slice(index.from, index.to)) };
+    const bytes = 128 + runs.reduce((n, r) => n + 64 + r.text.length * 2, 0);
+    while (this.bytes + bytes > this.cacheLimit && this.cache.size) {
+      const first = this.cache.keys().next().value!; this.bytes -= this.cache.get(first)!.bytes; this.cache.delete(first); this.stats.evictions++;
+    }
+    if (bytes <= this.cacheLimit) { this.cache.set(number, { line, bytes }); this.bytes += bytes; }
+    this.stats.builds++; return line;
+  }
+  visible(view: LayoutViewport): ShapedLine[] {
+    const first = Math.max(0, Math.floor(view.scrollTop / this.font.lineHeight));
+    const last = Math.min(this.lineCount, Math.ceil((view.scrollTop + view.height) / this.font.lineHeight));
+    const out: ShapedLine[] = [];
+    for (let i = first; i < last; i++) out.push(this.shape(i));
+    return out;
+  }
+  private lineAt(pos: number): number {
+    let lo = 0, hi = this.lines.length - 1;
+    while (lo < hi) { const mid = Math.ceil((lo + hi) / 2); if (this.lines[mid]!.from <= pos) lo = mid; else hi = mid - 1; }
+    return lo;
+  }
+  /** Snap within a whole browser-shaped run, preserving surrogate/combining clusters. */
+  boundary(pos: number, bias: -1 | 1 = -1): number {
+    pos = Math.max(0, Math.min(this.source.length, pos));
+    const index = this.lines[this.lineAt(pos)]!;
+    if (pos > index.to) return bias < 0 ? index.to : index.next;
+    const text = this.source.slice(index.from, index.to); const relative = pos - index.from;
+    for (const part of segmenter.segment(text)) {
+      const end = part.index + part.segment.length;
+      if (part.index === relative || end === relative) return pos;
+      if (part.index < relative && relative < end) return index.from + (bias < 0 ? part.index : end);
+    }
+    return pos;
+  }
+  advance(line: ShapedLine, pos: number): number {
+    pos = this.boundary(Math.max(line.from, Math.min(line.to, pos)));
+    this.metrics.font = this.font.font;
+    for (const run of line.runs) {
+      if (pos < run.from) return run.x;
+      if (pos <= run.to) return run.x + this.metrics.measureText(run.text.slice(0, pos - run.from)).width;
+    }
+    return line.width;
+  }
+  offsetInRun(run: ShapedRun, x: number, bias: -1 | 1): number {
+    if (x <= 0) return run.from; if (x >= run.width) return run.to;
+    this.metrics.font = this.font.font;
+    let lo = 0, hi = run.text.length;
+    while (lo < hi) {
+      const mid = Math.floor((lo + hi) / 2);
+      if (this.metrics.measureText(run.text.slice(0, mid)).width < x) lo = mid + 1; else hi = mid;
+    }
+    return this.boundary(run.from + (bias < 0 ? Math.max(0, lo - 1) : lo), bias);
+  }
+  coordsAtPos(pos: number, view: LayoutViewport): CodeRect | null {
+    if (!Number.isInteger(pos) || pos < 0 || pos > this.source.length) return null;
+    const number = this.lineAt(pos); const line = this.shape(number);
+    const left = (view.left ?? 0) + (view.gutter ?? 48) + this.advance(line, pos) - view.scrollLeft;
+    const top = (view.top ?? 0) + number * this.font.lineHeight - view.scrollTop;
+    return { left, right: left + 1, top, bottom: top + this.font.lineHeight };
+  }
+  posAtCoords(coords: { x: number; y: number }, view: LayoutViewport): number | null {
+    if (!Number.isFinite(coords.x) || !Number.isFinite(coords.y)) return null;
+    const n = Math.max(0, Math.min(this.lineCount - 1, Math.floor((coords.y - (view.top ?? 0) + view.scrollTop) / this.font.lineHeight)));
+    const line = this.shape(n); if (line.rtlUnsupported) return null;
+    const x = coords.x - (view.left ?? 0) - (view.gutter ?? 48) + view.scrollLeft;
+    if (x <= 0) return line.from;
+    if (x >= line.width) return line.to;
+    // Binary search measured prefixes, then choose the nearest grapheme boundary.
+    let lo = line.from, hi = line.to;
+    while (lo < hi) { const mid = Math.floor((lo + hi) / 2); if (this.advance(line, mid) < x) lo = mid + 1; else hi = mid; }
+    const after = this.boundary(lo, 1); const before = this.boundary(Math.max(line.from, after - 1), -1);
+    return Math.abs(this.advance(line, before) - x) <= Math.abs(this.advance(line, after) - x) ? before : after;
+  }
+  rangeRects(range: CodeRange, view: LayoutViewport): CodeRect[] {
+    const from = this.boundary(range.from); const to = this.boundary(range.to, 1);
+    if (to < from) return [];
+    const first = Math.max(this.lineAt(from), Math.floor(view.scrollTop / this.font.lineHeight), 0);
+    const last = Math.min(this.lineAt(to), Math.ceil((view.scrollTop + view.height) / this.font.lineHeight), this.lineCount - 1);
+    const out: CodeRect[] = [];
+    for (let n = first; n <= last; n++) {
+      const line = this.shape(n); const a = this.coordsAtPos(Math.max(from, line.from), view)!;
+      const b = this.coordsAtPos(Math.min(to, line.to), view)!;
+      const left = Math.max((view.left ?? 0) + (view.gutter ?? 48), a.left);
+      const right = Math.min((view.left ?? 0) + view.width, b.left + (to > line.to ? 8 : 0));
+      if (right >= left) out.push({ left, right: Math.max(left + 1, right), top: a.top, bottom: a.bottom });
+    }
+    return out;
+  }
+}

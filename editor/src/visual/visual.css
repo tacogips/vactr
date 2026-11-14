@@ -1,0 +1,98 @@
+/* The visual area (design 15.1.8): output panes o0..o3 and analyzer displays. */
+.visual-panes,
+.visual-analyzers {
+  padding: var(--vt-space-2) var(--vt-space-3);
+  border-top: var(--vt-border-w) solid var(--vt-border);
+}
+
+.visual-header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--vt-space-2);
+  align-items: center;
+  min-height: var(--vt-control-h);
+  margin-bottom: var(--vt-space-2);
+}
+
+.visual-title {
+  font-weight: 600;
+  font-size: var(--vt-text-xs);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--vt-text-muted);
+}
+
+.visual-video-status {
+  color: var(--vt-text-muted);
+  font-size: var(--vt-text-sm);
+}
+
+.visual-banner {
+  white-space: pre-wrap;
+  margin-bottom: var(--vt-space-2);
+  padding: var(--vt-space-1) var(--vt-space-2);
+  color: var(--vt-danger-text);
+  background: var(--vt-danger-bg);
+  font: var(--vt-text-sm)/1.3 var(--vt-font-mono);
+}
+
+.visual-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--vt-space-1);
+}
+
+.visual-panes[data-selection='tile'] .visual-grid {
+  grid-template-columns: 1fr 1fr;
+}
+
+.visual-pane {
+  position: relative;
+  background: var(--vt-bg-sunken);
+}
+
+.visual-pane canvas {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+}
+
+.visual-pane-label {
+  position: absolute;
+  top: var(--vt-space-1);
+  left: var(--vt-space-1);
+  padding: 0 var(--vt-space-1);
+  background: var(--vt-surface);
+  font-size: var(--vt-text-xs);
+  color: var(--vt-text-muted);
+}
+
+.visual-notice {
+  padding: var(--vt-space-2);
+  color: var(--vt-text-muted);
+  font-style: italic;
+}
+
+.visual-master,
+.visual-analyzer-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--vt-space-2);
+}
+
+.visual-display {
+  display: flex;
+  flex-direction: column;
+  gap: var(--vt-space-1);
+  font-size: var(--vt-text-xs);
+  color: var(--vt-text-muted);
+}
+
+.visual-display canvas {
+  background: var(--vt-bg-sunken);
+}
+
+.visual-readout {
+  font: var(--vt-text-sm)/1.3 var(--vt-font-mono);
+  color: var(--vt-text);
+}

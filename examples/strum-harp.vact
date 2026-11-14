@@ -1,0 +1,15 @@
+# Strum, harp and chord performance patterns on existing synth voices
+use-bpm 100
+
+# Spread chord tones upward, downward and with an alternating fade
+s :pd > chord [:c :maj7] > strum 1/32 :up :flat > gain 0.2 > d1
+s :pd > chord [:f :maj7] > strum 1/24 :down :fade > gain 0.18 > d2
+s :fm > chord [:g :m7] > strum 1/32 :alternate :fade > gain 0.14 > d3
+
+# Harp position scans the chord plate over the cycle
+s :analog > chord [:c :maj7] > harp {range sine 0 1} strips: 12 > wave :sine > gain 0.16 > d4
+
+# Orchid-style composition: chord, voicing, inversion, then strum
+s :pd > tune {edo 19} > perform [:c :maj7] mode: :strum inversion: [0 1 2 1] bass: true time: 1/32 dir: :alternate curve: :fade > gain 0.18 > d5
+s :fm > perform [:d :m7] mode: :arp arp: :up > gain 0.12 > d6
+s :analog > perform [:g :maj] mode: :harp pos: {range sine 0 1} strips: 16 > gain 0.12 > d7

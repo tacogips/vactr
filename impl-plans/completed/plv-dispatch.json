@@ -1,0 +1,366 @@
+{
+  "taskId": "plv",
+  "workflowMode": "issue-resolution",
+  "issueReference": "workflowInput 'Plaits voice layer PLV-30/31/40: voice lifetime, transparent template wiring, closeout' (no GitHub URL or number); local:impl-plans/active/modular-audio-handoff.md priority 4; workflow opus-luna-design-and-implement-review-loop-session-209",
+  "implementationBranch": "main",
+  "baseBranch": "main",
+  "remote": "origin",
+  "originalHead": "f5e623b726668ed69b201f5335a05faf311be32b",
+  "designDocPaths": [
+    "design-docs/specs/design-mutable-audio.md"
+  ],
+  "designAnchor": "design-docs/specs/design-mutable-audio.md#plaits-voice-level-trigger-and-low-pass-gate-layer-plv-001",
+  "acceptedDependencies": [
+    {
+      "planId": "PLV-10",
+      "planPath": "impl-plans/active/plv-10-voice-layer-dsp.md",
+      "commit": "f5e623b726668ed69b201f5335a05faf311be32b",
+      "provides": "src/dsp/ugen/voice_layer.rs: the shared voice-layer DSP (trigger, decay envelope, low-pass gate, level/accent, main/aux gain) and its unit tests."
+    },
+    {
+      "planId": "PLV-12",
+      "planPath": "impl-plans/active/plv-12-manifest-registration.md",
+      "commit": "f5e623b726668ed69b201f5335a05faf311be32b",
+      "provides": "Voice-layer registration in src/dsp/ported/manifest.rs and the voice_layer_label_eligible labelling support."
+    },
+    {
+      "planId": "PLV-20",
+      "planPath": "impl-plans/active/plv-20-gate-nodes.md",
+      "commit": "f5e623b726668ed69b201f5335a05faf311be32b",
+      "provides": "The vactrol-gate and decay-mod graph nodes (Node::VactrolGate, GATE_STATE_FLOATS = 16) with the lpg-mode, lpg-decay and lpg-color controls and editor metadata."
+    },
+    {
+      "planId": "PLV-21",
+      "planPath": "impl-plans/active/plv-21-voice-probe.md",
+      "commit": "f5e623b726668ed69b201f5335a05faf311be32b",
+      "provides": "The compare-plaits-voice probe (verification/compare_plaits_voice.py, verification/plaits_voice_reference.cc, examples/plaits_voice_reference.rs, mise task compare-plaits-voice)."
+    }
+  ],
+  "evidenceRoot": "tmp/plv",
+  "evidenceLayout": "evidenceRoot is tmp/plv. This run uses the per-session, per-plan subdirectory tmp/plv/s209/<planId>/ (a retry uses tmp/plv/s209/<planId>/attempt-<n>/). It holds each plan's full command logs; each log ends with an exit=<status> line; each plan's Progress Log records every command, exit status and log path. tmp/ is gitignored. Logs from session 205 under tmp/plv/PLV-*/ are not evidence for this run. A missing or truncated log is not a pass.",
+  "executionModel": {
+    "waves": [
+      ["PLV-30"],
+      ["PLV-31"],
+      ["PLV-40"]
+    ],
+    "sameBranchFanout": true,
+    "worktrees": false,
+    "workersMayChangeGitState": false,
+    "commitOwner": "The orchestrator commits the accepted design and these plans before fanout, and commits the implementation after review. Each commit uses the AGENTS.md numbered 1-6 section message with no Co-Authored-By or tool attribution. Workers never commit, stash, checkout, reset, branch, push or merge.",
+    "retryPolicy": "The waves are serial, so no concurrent plan shares the tree. If cargo reports a lock, wait about 60 s and retry, up to 10 times, then record a blocker and stop.",
+    "editProtocol": "Before each edit, re-read the file and record its sha256 and an intent snapshot. If the file drifted because of a change you did not make, re-read it, re-apply only your own change and record the drift. After editing, record the post-edit sha256. Never edit outside writePaths.",
+    "serialReconciliation": "Each shared path has exactly one owner. PLV-30 alone touches template.rs, build_helpers.rs, voice.rs and voice/lifetime.rs. PLV-31 alone touches templates.vact, the editor template lists, golden_digests.txt (the 24 Plaits graph lines only), the 14 mem_total test files and src/types/tests/inst/templates.rs. PLV-40 alone touches the manifest label, the inventory, the notices, the Plaits plans, the handoff, the README and the design status. Formatting is rustfmt on each plan's own files only. A failing full nextest run is rerun with --no-fail-fast before any repair. Any repair outside a plan's writePaths is recorded as a blocker and applied serially by the orchestrator review step, with file, cause, fix and pre/post sha256."
+  },
+  "reviewContext": {
+    "issueReference": "workflowInput 'Plaits voice layer PLV-30/31/40: voice lifetime, transparent template wiring, closeout' (no GitHub issue); repo tacogips/vactr, branch main, HEAD f5e623b; design review comm-002705 and plan review comm-002707 (accepted); workflow opus-luna-design-and-implement-review-loop-session-209",
+    "userProblem": "The shared Plaits voice layer (PLV-10/12/20/21, f5e623b) is not yet used by any template. Session 205 wired it, but that changed 8 golden render digests, because new gate-only source nodes moved every kernel's Kahn compiled index and seed. It also broke 14 unowned mem_total tests and 1 last-node test.",
+    "requiredOutcomes": [
+      "A gate-elided seed ordinal (Template::seed_ordinal) used at both Kx seed sites, identity for gate-free graphs (PLV-30).",
+      "A layer-shaped voice lifetime in src/dsp/voice/lifetime.rs; off and bypassed voices bit-identical (PLV-30).",
+      "All 24 Plaits templates wired with two vactrol-gate nodes and the neutral controls lpg-mode (default off), lpg-decay and lpg-color, with editor metadata (PLV-31).",
+      "golden_digests.txt changes in exactly the 24 Plaits graph lines, with 0 render lines (PLV-31).",
+      "14 mem_total expectations +2*GATE_STATE_FLOATS and the last-node test updated in the owning plan with a recorded reason (PLV-31).",
+      "The probe re-run on the final tree; the voice_layer label from voice_layer_label_eligible; audit-upstream 0 errors; notices, Plaits plans and handoff (priorities 4 and 7) updated (PLV-40)."
+    ],
+    "nonGoals": [
+      "Changes to PLV-10/12/20/21 deliverables (voice_layer.rs, vactrol_gate.rs, the registration tuples, the probe).",
+      "Changes to topo_order, assign_mem or the gate memory layout.",
+      "Pre-wiring decay-mod into the 24 templates.",
+      "Any SourcePort claim or engine coverage change.",
+      "Archiving plans."
+    ],
+    "constraints": [
+      "Golden render digests byte-identical; only the 24 Plaits graph lines change.",
+      "Provenance: audit-upstream 0 errors with VACTR_MI_REFERENCE set to the pinned checkout; no tables, samples or presets imported.",
+      "User-facing names contain no upstream module names.",
+      "Allocation-free callback and allocation-free in-place Template::build; native and wasm32 identical; every touched Rust file under 1000 lines (voice.rs <= 930).",
+      "Writes only under src/, examples/, verification/, design-docs/, impl-plans/, THIRD_PARTY_NOTICES.md, mise.toml and tmp/; concrete file paths only.",
+      "Cargo with CARGO_TERM_QUIET=true; nextest with NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1.",
+      "Commit messages in the numbered 1-6 section format, with no Co-Authored-By or tool attribution."
+    ],
+    "designDecisionsAndRationale": [
+      "D-209-1: the seed ordinal is the position in topo_order of the gate-elided graph. Gates are removed and their out-edges redirected to the subject; sources feeding only gate ports >= 1 are removed; the port-0 subject is kept. This is exact for the edit rule and the identity for gate-free graphs.",
+      "D-209-2: the gate state stays in the fixed mem region; mem_total +32 per wired template; the pinned tests are updated with the reason.",
+      "D-209-3: serial plans with single ownership.",
+      "D-209-5: lpg-mode defaults to off, an exact pass-through with the implicit fade kept.",
+      "D-209-6: the upstream trigger delay is an effective 4 blocks (1 ms); Vactr has none, so onset timing does not move."
+    ],
+    "intentionalTradeoffs": [
+      "lpg-mode defaults to off, so every existing template keeps its render digest; the gated sound is opt-in (D-209-5).",
+      "Every wired template gains 2 * GATE_STATE_FLOATS (32) mem floats, even in off mode, in exchange for a fixed, allocation-free gate layout (D-209-2).",
+      "The 24 Plaits graph digest lines change because of the new gate nodes, while every render line stays byte-identical; the graph change is justified by the design's gate-elided seed-order section.",
+      "Vactr applies no 1 ms trigger delay, so onset timing does not move (D-209-6).",
+      "One extra bounded topo_order pass per Template::build computes the seed ordinals; topo_order itself is not changed.",
+      "Serial single-owner plans (PLV-30 -> PLV-31 -> PLV-40) instead of parallel fanout, to avoid the unowned-file breakage of session 205 (D-209-3)."
+    ],
+    "supportedEdgeCases": [
+      "Graphs with no vactrol-gate: the seed ordinal equals the compiled index by construction (every non-Plaits template).",
+      "Shared sources (freq, a velocity param that a kernel also reads, slot/lane constants deduplicated with a kernel mode: constant) are not gate-only and are kept in the elided graph.",
+      "A gate whose port-0 subject is itself a source node (such as white-noise) keeps that subject.",
+      "A user instrument that appends vactrol-gate keeps its kernel seeds.",
+      "Voices that are off, or whose gate lanes are all bypassed, keep the implicit fade and today's lifetime rules. Layer-shaped voices (every gate latched a non-bypassed ping or level) skip ienv and end when every gate reports done.",
+      "Cut-group and steal fades still apply to layer-shaped voices.",
+      "Gate state resets on in-place rebuild; Template::build stays allocation-free in place; native and wasm32 produce the same ordinals.",
+      "mem_total +32, and the budget-minus-one MemExceeded boundaries move with it, in the 14 owned test files. No flexible delay line is clamped at the test budget (24000) or the production budget."
+    ],
+    "outOfScopeEdgeCases": [
+      "Pre-wiring decay-mod into templates. A user who opts into decay-mod may change that kernel's seed, as documented.",
+      "Emulating the upstream trigger delay; any SourcePort fidelity claim or engine coverage change.",
+      "Changes to topo_order, assign_mem, the gate memory layout, or the PLV-10/12/20/21 deliverables.",
+      "Archiving plans to impl-plans/completed/.",
+      "Non-Plaits templates, including the Braids macro-* templates, beyond confirming that their digests are unchanged."
+    ],
+    "sourcePaths": [
+      "design-docs/specs/design-mutable-audio.md",
+      "impl-plans/active/plv-30-voice-lifetime.md",
+      "impl-plans/active/plv-31-template-wiring.md",
+      "impl-plans/active/plv-40-evidence-closeout.md",
+      "impl-plans/active/modular-audio-handoff.md",
+      "impl-plans/active/modular-plaits-engines.md",
+      "src/dsp/ugen/template.rs",
+      "src/dsp/ugen/build_helpers.rs",
+      "src/dsp/voice.rs",
+      "src/dsp/ugen/vactrol_gate.rs",
+      "src/dsp/ugen/voice_layer.rs",
+      "src/dsp/ported/manifest.rs",
+      "src/prelude/templates.vact",
+      "src/host/tests/e2e/templates/golden.rs",
+      "src/host/tests/e2e/templates/golden_digests.txt",
+      "verification/upstream_inventory.toml",
+      "THIRD_PARTY_NOTICES.md",
+      "tmp/plv-wave3-saved/wave3-tracked.patch"
+    ]
+  },
+  "plans": [
+    {
+      "planId": "PLV-30",
+      "planPath": "impl-plans/active/plv-30-voice-lifetime.md",
+      "dependsOn": [],
+      "writePaths": [
+        "src/dsp/ugen/build_helpers.rs",
+        "src/dsp/ugen/template.rs",
+        "src/dsp/voice.rs",
+        "src/dsp/voice/lifetime.rs",
+        "src/dsp/tests/dsp/seed_order.rs",
+        "src/dsp/tests/dsp/voice_lifetime.rs",
+        "src/dsp/tests/dsp.rs",
+        "impl-plans/active/plv-30-voice-lifetime.md",
+        "tmp/plv/s209/PLV-30/hashes.txt",
+        "tmp/plv/s209/PLV-30/1-fmt.log",
+        "tmp/plv/s209/PLV-30/2-check.log",
+        "tmp/plv/s209/PLV-30/3-clippy.log",
+        "tmp/plv/s209/PLV-30/4-wasm.log",
+        "tmp/plv/s209/PLV-30/5-lsp.log",
+        "tmp/plv/s209/PLV-30/6-focused.log",
+        "tmp/plv/s209/PLV-30/7-nextest.log",
+        "tmp/plv/s209/PLV-30/7-nextest-nff.log",
+        "tmp/plv/s209/PLV-30/8-lines.log",
+        "tmp/plv/s209/PLV-30/9-golden-unchanged.log"
+      ],
+      "sharedPaths": [
+        "src/dsp/ugen/vactrol_gate.rs",
+        "src/dsp/ugen/mod.rs",
+        "src/dsp/graph.rs",
+        "src/dsp/tests/dsp/voice_layout.rs",
+        "src/dsp/tests/dsp/vactrol_gate.rs",
+        "src/dsp/tests/dsp/clock_noise_pair.rs",
+        "src/dsp/tests/dsp/multi_output/invariance.rs",
+        "src/dsp/tests/dsp/analog_pair.rs",
+        "src/dsp/alloc_probe.rs",
+        "tmp/plv-wave3-saved/src/dsp/voice/lifetime.rs",
+        "tmp/plv-wave3-saved/src/dsp/tests/dsp/voice_lifetime.rs"
+      ],
+      "sharedPathNotes": [
+        {"path": "src/dsp/ugen/build_helpers.rs", "intendedEdit": "Add pub(super) fn seed_ordinals(n: usize, nodes: &[Node], edges: &[Edge], order: &[u16]) -> Result<[u16; NODE_CAP], BuildError>, indexed by compiled index; fixed arrays only; topo_order unchanged."},
+        {"path": "src/dsp/ugen/template.rs", "intendedEdit": "Add pub gates: u8, private seeds: [u16; NODE_CAP] and pub fn seed_ordinal(&self, i: usize) -> u16; init in boxed(); reset gates and set seeds in build(); count Node::VactrolGate in compile_node."},
+        {"path": "src/dsp/voice.rs", "intendedEdit": "mod lifetime; both Kx seed sites use t.seed_ordinal(i); implicit predicate and Voice::finished delegate to lifetime; file <= 930 lines."},
+        {"path": "src/dsp/tests/dsp.rs", "intendedEdit": "Two lines only: mod seed_order; and mod voice_lifetime; (alphabetical)."}
+      ],
+      "acceptanceCriteria": [
+        "seed_ordinals, Template::seed_ordinal, Template.gates and seeds exist with the pinned signatures; both Kx sites use the ordinal.",
+        "The seed-order tests pass, including the shift-compensation case that asserts the compiled index really differs, the subject-source case and the zero-allocation build.",
+        "The lifetime tests pass; off and bypassed voices are bit-identical to before.",
+        "golden_digests.txt and templates.vact are unchanged (git diff --exit-code), and the golden suites pass.",
+        "Verification commands 1-9 pass with complete logs under tmp/plv/s209/PLV-30/."
+      ],
+      "verification": [
+        "CARGO_TERM_QUIET=true cargo fmt --check",
+        "CARGO_TERM_QUIET=true cargo check -q --all-targets",
+        "CARGO_TERM_QUIET=true cargo clippy -q --all-targets -- -D warnings",
+        "CARGO_TERM_QUIET=true cargo check -q --target wasm32-unknown-unknown --lib",
+        "CARGO_TERM_QUIET=true cargo check -q --all-targets --features lsp",
+        "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run seed_order voice_lifetime vactrol_gate golden multi_output migrated_pairs select_output",
+        "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run",
+        "wc -l src/dsp/voice.rs src/dsp/voice/lifetime.rs src/dsp/ugen/template.rs src/dsp/ugen/build_helpers.rs src/dsp/tests/dsp/seed_order.rs src/dsp/tests/dsp/voice_lifetime.rs src/dsp/tests/dsp.rs",
+        "git diff --exit-code -- src/host/tests/e2e/templates/golden_digests.txt src/prelude/templates.vact"
+      ]
+    },
+    {
+      "planId": "PLV-31",
+      "planPath": "impl-plans/active/plv-31-template-wiring.md",
+      "dependsOn": ["PLV-30"],
+      "writePaths": [
+        "src/prelude/templates.vact",
+        "src/dsp/meta/templates.rs",
+        "src/dsp/meta/templates/plaits.rs",
+        "src/host/tests/e2e/templates/golden_digests.txt",
+        "src/host/tests/e2e/templates.rs",
+        "src/host/tests/e2e/templates/voice_layer.rs",
+        "examples/voice-layer.vact",
+        "src/host/tests/e2e/templates/analog_pair.rs",
+        "src/host/tests/e2e/templates/chip.rs",
+        "src/host/tests/e2e/templates/chord_pair.rs",
+        "src/host/tests/e2e/templates/grain_pair.rs",
+        "src/host/tests/e2e/templates/modal.rs",
+        "src/host/tests/e2e/templates/particle.rs",
+        "src/host/tests/e2e/templates/shape_pair.rs",
+        "src/host/tests/e2e/templates/six_op_original.rs",
+        "src/host/tests/e2e/templates/speech_original.rs",
+        "src/host/tests/e2e/templates/string_machine_pair.rs",
+        "src/host/tests/e2e/templates/string_voice.rs",
+        "src/host/tests/e2e/templates/table_terrain_pair.rs",
+        "src/host/tests/e2e/templates/terrain_pair.rs",
+        "src/host/tests/e2e/templates/voice_engines.rs",
+        "src/types/tests/inst/templates.rs",
+        "src/host/tests/e2e/templates/migrated_pairs.rs",
+        "src/host/tests/e2e/templates/select_output.rs",
+        "impl-plans/active/plv-31-template-wiring.md",
+        "tmp/plv/s209/PLV-31/hashes.txt",
+        "tmp/plv/s209/PLV-31/golden-pre.txt",
+        "tmp/plv/s209/PLV-31/1-fmt.log",
+        "tmp/plv/s209/PLV-31/2-check.log",
+        "tmp/plv/s209/PLV-31/3-clippy.log",
+        "tmp/plv/s209/PLV-31/4-wasm.log",
+        "tmp/plv/s209/PLV-31/5-lsp.log",
+        "tmp/plv/s209/PLV-31/6-focused.log",
+        "tmp/plv/s209/PLV-31/7-nextest.log",
+        "tmp/plv/s209/PLV-31/7-nextest-nff.log",
+        "tmp/plv/s209/PLV-31/8-lines.log",
+        "tmp/plv/s209/PLV-31/9-bless.log",
+        "tmp/plv/s209/PLV-31/10-golden-diff.log",
+        "tmp/plv/s209/PLV-31/11-gate-count.log"
+      ],
+      "sharedPaths": [
+        "src/host/tests/e2e/templates/golden.rs",
+        "src/host/tests/e2e/templates/quad_stems.rs",
+        "src/host/tests/e2e/templates/digital_drum.rs",
+        "src/dsp/ported/tests.rs",
+        "src/dsp/meta.rs",
+        "src/dsp/ugen/template.rs",
+        "src/dsp/ugen/vactrol_gate.rs",
+        "src/types/tests/inst.rs",
+        "tmp/plv-wave3-saved/wave3-tracked.patch",
+        "tmp/plv-wave3-saved/src/dsp/meta/templates/plaits.rs",
+        "tmp/plv-wave3-saved/src/host/tests/e2e/templates/voice_layer.rs",
+        "tmp/plv-wave3-saved/examples/voice-layer.vact"
+      ],
+      "sharedPathNotes": [
+        {"path": "src/host/tests/e2e/templates/golden_digests.txt", "intendedEdit": "Exactly the 24 Plaits graph lines from the bless output; zero render lines; restore from golden-pre.txt and record a blocker if any render line differs."},
+        {"path": "src/host/tests/e2e/templates/voice_engines.rs", "intendedEdit": "mem_total pins at lines 270, 337, 415, 524, 633 and 738 become old + 2*GATE_STATE_FLOATS, and the boundaries at 419, 528, 637 and 742 move with them; the clock-noise message is reworded; nothing else."},
+        {"path": "src/host/tests/e2e/templates/analog_pair.rs", "intendedEdit": "mem_total expectation and its budget-minus-one boundary + 2*GATE_STATE_FLOATS; the same rule applies to the other 12 mem files in writePaths."},
+        {"path": "src/types/tests/inst/templates.rs", "intendedEdit": "templates_realize_at_session_start: the 24 Plaits names expect a last node of vactrol-gate; non-Plaits names are unchanged."},
+        {"path": "src/host/tests/e2e/templates/migrated_pairs.rs", "intendedEdit": "Conditional: only where a test embeds prelude template text and fails because of the gates; never old-form fixtures or render comparisons."},
+        {"path": "src/host/tests/e2e/templates/select_output.rs", "intendedEdit": "Conditional, same restriction as migrated_pairs.rs."},
+        {"path": "src/host/tests/e2e/templates.rs", "intendedEdit": "One mod voice_layer; line."},
+        {"path": "src/dsp/meta/templates.rs", "intendedEdit": "mod plaits; and the 24 Plaits entries reference plaits::<NAME>; table order unchanged."}
+      ],
+      "acceptanceCriteria": [
+        "All 24 templates follow the edit rule; grep -o vactrol-gate count == 48; chip-voice gates carry clocked: chip-clocked.",
+        "The editor lists carry lpg-mode, lpg-decay and lpg-color before amp; templates.rs and plaits.rs are under 1000 lines.",
+        "golden_digests.txt differs in exactly the 24 Plaits graph lines, with 0 render lines.",
+        "The 14 mem files and src/types/tests/inst/templates.rs are updated as specified, with each changed line logged with its reason.",
+        "The pre-wiring identity tests (compiled seed ordinals and bitwise default renders for clock-noise, dual-snare, swarm and speech) pass.",
+        "Verification commands 1-11 pass with complete logs under tmp/plv/s209/PLV-31/."
+      ],
+      "verification": [
+        "CARGO_TERM_QUIET=true cargo fmt --check",
+        "CARGO_TERM_QUIET=true cargo check -q --all-targets",
+        "CARGO_TERM_QUIET=true cargo clippy -q --all-targets -- -D warnings",
+        "CARGO_TERM_QUIET=true cargo check -q --target wasm32-unknown-unknown --lib",
+        "CARGO_TERM_QUIET=true cargo check -q --all-targets --features lsp",
+        "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run --no-fail-fast voice_layer golden migrated_pairs select_output ported templates_realize analog_pair chip chord_pair grain_pair modal particle shape_pair six_op_original speech_original string_machine_pair string_voice table_terrain_pair terrain_pair voice_engines",
+        "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run",
+        "wc -l src/dsp/meta/templates.rs src/dsp/meta/templates/plaits.rs src/host/tests/e2e/templates/voice_layer.rs src/host/tests/e2e/templates.rs src/host/tests/e2e/templates/voice_engines.rs src/types/tests/inst/templates.rs",
+        "VACTR_BLESS_GOLDEN=1 CARGO_TERM_QUIET=true cargo test -q --lib bless_golden_digests -- --ignored",
+        "git diff -U0 -- src/host/tests/e2e/templates/golden_digests.txt",
+        "test \"$(grep -o 'vactrol-gate' src/prelude/templates.vact | wc -l | tr -d ' ')\" = 48"
+      ]
+    },
+    {
+      "planId": "PLV-40",
+      "planPath": "impl-plans/active/plv-40-evidence-closeout.md",
+      "dependsOn": ["PLV-31"],
+      "writePaths": [
+        "src/dsp/ported/manifest.rs",
+        "src/dsp/ported/tests.rs",
+        "verification/upstream_inventory.toml",
+        "THIRD_PARTY_NOTICES.md",
+        "design-docs/specs/design-mutable-audio.md",
+        "impl-plans/active/modular-plaits-engines.md",
+        "impl-plans/active/modular-plaits-oscillators.md",
+        "impl-plans/active/modular-plaits-resonant-noise.md",
+        "impl-plans/active/modular-plaits-wave-replacements.md",
+        "impl-plans/active/modular-plaits-cleared-replacements.md",
+        "impl-plans/active/modular-audio-handoff.md",
+        "impl-plans/README.md",
+        "impl-plans/active/plv-12-manifest-registration.md",
+        "impl-plans/active/plv-21-voice-probe.md",
+        "impl-plans/active/plv-40-evidence-closeout.md",
+        "tmp/plv/s209/PLV-40/hashes.txt",
+        "tmp/plv/s209/PLV-40/1-fmt.log",
+        "tmp/plv/s209/PLV-40/2-check.log",
+        "tmp/plv/s209/PLV-40/3-clippy.log",
+        "tmp/plv/s209/PLV-40/4-wasm.log",
+        "tmp/plv/s209/PLV-40/5-lsp.log",
+        "tmp/plv/s209/PLV-40/6-nextest.log",
+        "tmp/plv/s209/PLV-40/7-compare.json",
+        "tmp/plv/s209/PLV-40/7-compare.log",
+        "tmp/plv/s209/PLV-40/8-audit.log",
+        "tmp/plv/s209/PLV-40/9-lines.log",
+        "tmp/plv/s209/PLV-40/10-diffcheck.log",
+        "tmp/plv/s209/PLV-40/11-status.log",
+        "tmp/plv/s209/PLV-40/12-golden.log"
+      ],
+      "sharedPaths": [
+        "verification/audit_upstream.py",
+        "verification/compare_plaits_voice.py",
+        "verification/plaits_voice_reference.cc",
+        "examples/plaits_voice_reference.rs",
+        "src/dsp/ugen/voice_layer.rs",
+        "src/dsp/ugen/vactrol_gate.rs",
+        "src/prelude/templates.vact",
+        "tmp/plv/s209/PLV-31/10-golden-diff.log"
+      ],
+      "sharedPathNotes": [
+        {"path": "src/dsp/ported/manifest.rs", "intendedEdit": "Only the voice_layer value inside implemented(), Pending -> SourceStage, and only if 7-compare.json has voice_layer_label_eligible true; never SourcePort."},
+        {"path": "verification/upstream_inventory.toml", "intendedEdit": "Only if audit-upstream reports errors; the voice files already exist as source and must stay source."},
+        {"path": "THIRD_PARTY_NOTICES.md", "intendedEdit": "One paragraph on opt-in, default-off wiring and the measured label in the existing voice-level section; the stale 'trigger/LPG not included/remains open/still differ' clauses point to that section."},
+        {"path": "design-docs/specs/design-mutable-audio.md", "intendedEdit": "Only a new '### Implementation status (2026-09-30)' subsection at the end of the PLV-001 section."},
+        {"path": "impl-plans/active/modular-audio-handoff.md", "intendedEdit": "Priority 7: MOD-004 stereo edges done (85a300a, b6fa077, 0a15742, 2cd547a); priority 4: PLV-001 progress and probe result; Last Updated 2026-09-30."},
+        {"path": "impl-plans/active/plv-12-manifest-registration.md", "intendedEdit": "Header Status line only (the same for plv-21). PLV-30 and PLV-31 set their own Status lines."}
+      ],
+      "acceptanceCriteria": [
+        "7-compare.json is recorded (or BLOCKED), and the manifest label matches voice_layer_label_eligible; nothing is SourcePort.",
+        "The audit reports 0 errors; voice.{h,cc}, envelope.h and fx/low_pass_gate.h stay use=source.",
+        "The notices describe the default-off opt-in wiring and the measured label, with no stale voice-level-missing clauses.",
+        "The engines plan and its four subplans, the handoff (priorities 4 and 7), the README and the design status carry the evidence.",
+        "Verification commands 1-12 pass with complete logs under tmp/plv/s209/PLV-40/, or are recorded as BLOCKED with the reason."
+      ],
+      "verification": [
+        "CARGO_TERM_QUIET=true cargo fmt --check",
+        "CARGO_TERM_QUIET=true cargo check -q --all-targets",
+        "CARGO_TERM_QUIET=true cargo clippy -q --all-targets -- -D warnings",
+        "CARGO_TERM_QUIET=true cargo check -q --target wasm32-unknown-unknown --lib",
+        "CARGO_TERM_QUIET=true cargo check -q --all-targets --features lsp",
+        "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run",
+        "REF=/private/tmp/claude-501/-Users-taco-gits-tacogips-vactr/dbc9d07b-52ba-4d28-a585-b67bf9048bc9/scratchpad/eurorack sh -c 'test -d \"$REF\" && VACTR_MI_REFERENCE=\"$REF\" mise run compare-plaits-voice > tmp/plv/s209/PLV-40/7-compare.json 2> tmp/plv/s209/PLV-40/7-compare.log'",
+        "REF=/private/tmp/claude-501/-Users-taco-gits-tacogips-vactr/dbc9d07b-52ba-4d28-a585-b67bf9048bc9/scratchpad/eurorack sh -c 'test -d \"$REF\" && VACTR_MI_REFERENCE=\"$REF\" mise run audit-upstream > tmp/plv/s209/PLV-40/8-audit.log 2>&1'",
+        "{ git diff --name-only f5e623b -- '*.rs'; git ls-files -o --exclude-standard -- '*.rs'; } | sort -u | while read -r f; do [ -f \"$f\" ] && wc -l \"$f\"; done | awk '$1 >= 1000 {bad=1} END {exit bad}'",
+        "git diff --check",
+        "test -z \"$(git status --short | grep -vE '^.. (src/|examples/|verification/|design-docs/|impl-plans/|THIRD_PARTY_NOTICES.md|mise.toml)')\"",
+        "test \"$(git diff -U0 f5e623b -- src/host/tests/e2e/templates/golden_digests.txt | grep -cE '^[-+]render')\" = 0 && test \"$(git diff -U0 f5e623b -- src/host/tests/e2e/templates/golden_digests.txt | grep -cE '^[-+]graph')\" = 48"
+      ]
+    }
+  ]
+}

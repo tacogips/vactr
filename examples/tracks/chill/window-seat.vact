@@ -1,0 +1,80 @@
+# Window Seat — original instrumental chill, 88 BPM, A minor.
+# Laid-back syncopated bass, warm electric keys and restrained drums.
+# 64 bars, eight 8-bar sections: intro / A / A+ / contrast / B / B+ / reprise / ending.
+# Play: target/debug/vactr run examples/tracks/chill/window-seat.vact --host native --cycles 64
+# Gains repeat after64 bars; offline render stops at64 bars and preserves the score-tail.
+
+# Local voices make each file self-contained. All sounds are synthesized.
+inst score-kick score-punch: float = 1.8 score-body: float = 0.22:
+	fm-drum freq fm-amount: 0.4 pitch-sweep: score-punch decay: score-body drum-noise: 0.01 drive: 0.12 > * amp
+
+inst score-snare grit: float = 0.5 score-body: float = 0.14:
+	{gaussian-noise 0.5 > * grit} > + {* {sin-osc {* freq 2.5}} 0.3}
+		> hpf 180 > lpf 7200 > * {env-perc 0.001 score-body} > * amp
+
+inst score-hat score-body: float = 0.055:
+	gaussian-noise 0.5 > hpf 6200 > lpf 11000 > * {env-perc 0.001 score-body} > * amp
+
+inst score-bass score-brightness: float = 800 score-roundness: float = 0.6:
+	{sin-osc freq > * score-roundness} > + {saw freq > * {- 1 score-roundness}}
+		> lpf score-brightness > * {env-adsr 0.008 0.12 0.7 0.18} > * amp
+
+inst score-keys score-color: float = 1.5 score-softness: float = 0.65:
+	fm-op freq ratio: 1 index: {* score-color {env-perc 0.002 score-softness}}
+		> fm-mod {fm-op freq ratio: 2 index: 0.25}
+		> * {env-perc 0.005 score-softness} > * amp
+
+inst score-pad score-brightness: float = 1900 score-air: float = 0.35:
+	{tri freq > * 0.6} > + {sin-osc {* freq 1.003} > * 0.4}
+		> + {sin-osc {* freq 2.001} > * score-air}
+		> lpf score-brightness > * {env-adsr 0.6 0.8 0.75 1.8} > * amp
+
+inst score-lead score-warmth: float = 0.7 score-tail: float = 0.28:
+	{sin-osc freq > * score-warmth} > + {tri freq > * {- 1 score-warmth}}
+		> * {env-perc 0.008 score-tail} > * amp
+
+use-bpm 88
+
+bus :kick:
+	gain 0
+
+bus :music:
+	hpf cutoff: 35
+		> compressor sidechain: :kick threshold: -24 ratio: 2.5 attack: 0.004 release: 0.13 knee: 5 mix: 0.3
+
+bus :air:
+	tape-delay time: 0.341 feedback: 0.28 tone: 3000 drive: 1.4 wow: 0.25 mix: 0.18 > schroeder-reverb size: 0.6 decay: 2.2 damping: 0.55 mix: 0.25
+		> hpf cutoff: 140
+
+master:
+	compressor threshold: -14 ratio: 1.5 attack: 0.03 release: 0.18 knee: 6 makeup: 0
+		> limiter ceiling: -2 release: 0.08
+
+let changes {alt [:a3 :m7] [:f3 :maj7] [:c4 :maj7] [:g3 :dom7] [:a3 :m7] [:f3 :maj7] [:c4 :maj7] [:g3 :dom7] [:a3 :m7] [:f3 :maj7] [:c4 :maj7] [:g3 :dom7] [:a3 :m7] [:f3 :maj7] [:c4 :maj7] [:g3 :dom7] [:a3 :m7] [:f3 :maj7] [:c4 :maj7] [:g3 :dom7] [:a3 :m7] [:f3 :maj7] [:c4 :maj7] [:g3 :dom7] [:a3 :m7] [:f3 :maj7] [:c4 :maj7] [:g3 :dom7] [:a3 :m7] [:f3 :maj7] [:c4 :maj7] [:g3 :dom7] [:a3 :m7] [:f3 :maj7] [:c4 :maj7] [:g3 :dom7] [:a3 :m7] [:f3 :maj7] [:c4 :maj7] [:g3 :dom7] [:a3 :m7] [:f3 :maj7] [:c4 :maj7] [:g3 :dom7] [:a3 :m7] [:f3 :maj7] [:c4 :maj7] [:g3 :dom7] [:a3 :m7] [:f3 :maj7] [:c4 :maj7] [:g3 :dom7] [:a3 :m7] [:f3 :maj7] [:c4 :maj7] [:g3 :dom7] [:a3 :m7] [:f3 :maj7] [:c4 :maj7] [:g3 :dom7] [:a3 :m7] [:f3 :maj7] [:c4 :maj7] [:a3 :m7]}
+let phrase-a [:e5 nil :c5 :b4 nil :a4 nil :c5]
+let phrase-b [:a4 :c5 nil :e5 :d5 nil :b4 nil]
+let cadence [:a5 nil nil nil]
+let motif {cat [phrase-a phrase-a phrase-a phrase-a phrase-a phrase-a phrase-a phrase-b phrase-a phrase-a phrase-a phrase-a phrase-a phrase-a phrase-a phrase-b phrase-a phrase-a phrase-a phrase-a phrase-a phrase-a phrase-a phrase-b phrase-b phrase-b phrase-b phrase-b phrase-b phrase-b phrase-b phrase-b phrase-b phrase-b phrase-b phrase-b phrase-b phrase-b phrase-b phrase-b phrase-b phrase-b phrase-b phrase-b phrase-b phrase-b phrase-b phrase-b phrase-a phrase-a phrase-a phrase-a phrase-a phrase-a phrase-a phrase-b phrase-b phrase-b phrase-b phrase-b phrase-b phrase-b phrase-b cadence]}
+
+let bass-bar-0 [:a2 nil :e3 :a3]
+let bass-bar-1 [:f2 nil :c3 :f3]
+let bass-bar-2 [:c3 nil :g2 :e3]
+let bass-bar-3 [:g2 nil :d3 :g3]
+let bass-cadence [:a2 nil :a2 nil]
+let bass-line {cat [bass-bar-0 bass-bar-1 bass-bar-2 bass-bar-3 bass-bar-0 bass-bar-1 bass-bar-2 bass-bar-3 bass-bar-0 bass-bar-1 bass-bar-2 bass-bar-3 bass-bar-0 bass-bar-1 bass-bar-2 bass-bar-3 bass-bar-0 bass-bar-1 bass-bar-2 bass-bar-3 bass-bar-0 bass-bar-1 bass-bar-2 bass-bar-3 bass-bar-0 bass-bar-1 bass-bar-2 bass-bar-3 bass-bar-0 bass-bar-1 bass-bar-2 bass-bar-3 bass-bar-0 bass-bar-1 bass-bar-2 bass-bar-3 bass-bar-0 bass-bar-1 bass-bar-2 bass-bar-3 bass-bar-0 bass-bar-1 bass-bar-2 bass-bar-3 bass-bar-0 bass-bar-1 bass-bar-2 bass-bar-3 bass-bar-0 bass-bar-1 bass-bar-2 bass-bar-3 bass-bar-0 bass-bar-1 bass-bar-2 bass-bar-3 bass-bar-0 bass-bar-1 bass-bar-2 bass-bar-3 bass-bar-0 bass-bar-1 bass-bar-2 bass-cadence]}
+
+# Sustained harmony; one chord per bar, but absolute section gains span64 bars.
+s :score-pad > chord changes > voicing > score-brightness 1400 > score-air 0.35 > legato 1.1 > gain {slow [0.0225 0.0225 0.0225 0.0225 0.0225 0.0225 0.0225 0.0225 0.045 0.045 0.045 0.045 0.045 0.045 0.045 0.045 0.045 0.045 0.045 0.045 0.045 0.045 0.045 0.045 0.0292 0.0292 0.0292 0.0292 0.0292 0.0292 0.0292 0.0292 0.0405 0.0405 0.0405 0.0405 0.0405 0.0405 0.0405 0.0405 0.045 0.045 0.045 0.045 0.045 0.045 0.045 0.045 0.0382 0.0382 0.0382 0.0382 0.0382 0.0382 0.0382 0.0382 0.0135 0.0135 0.01147 0.00945 0.00743 0.0054 0.00337 0.00162] 64} > pan 0.42 > bus :air > d1
+
+# Contrast and response phrases alternate over two bars.
+s :score-lead > note motif > score-tail 0.28 > score-warmth 0.85 > gain {slow [0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0715 0.0715 0.0715 0.0715 0.0715 0.0715 0.0715 0.0715 0.0975 0.0975 0.0975 0.0975 0.0975 0.0975 0.0975 0.0975 0.0585 0.0585 0.0585 0.0585 0.0585 0.0585 0.0585 0.0585 0.13 0.13 0.13 0.13 0.13 0.13 0.13 0.13 0.13 0.13 0.13 0.13 0.13 0.13 0.13 0.13 0.091 0.091 0.091 0.091 0.091 0.091 0.091 0.091 0.026 0.026 0.0221 0.0182 0.0143 0.0104 0.0065 0.00312] 64} > pan 0.58 > bus :air > d2
+
+s :score-bass > note bass-line > score-roundness 0.85 > score-brightness 650 > legato 0.75 > gain {slow [0.098 0.098 0.098 0.098 0.098 0.098 0.098 0.098 0.224 0.224 0.224 0.224 0.224 0.224 0.224 0.224 0.28 0.28 0.28 0.28 0.28 0.28 0.28 0.28 0.14 0.14 0.14 0.14 0.14 0.14 0.14 0.14 0.28 0.28 0.28 0.28 0.28 0.28 0.28 0.28 0.28 0.28 0.28 0.28 0.28 0.28 0.28 0.28 0.238 0.238 0.238 0.238 0.238 0.238 0.238 0.238 0.07 0.07 0.0595 0.049 0.0385 0.028 0.0175 0.0084] 64} > bus :music > d3
+
+# Rhythm enters after the intro, lifts in B+, and clears for the ending.
+s :score-kick > note [:a2 nil nil :a2 nil nil :a2 nil] > score-punch 1.5 > score-body 0.19 > gain {slow [0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.44 0.44 0.44 0.44 0.44 0.44 0.44 0.44 0.55 0.55 0.55 0.55 0.55 0.55 0.55 0.55 0.22 0.22 0.22 0.22 0.22 0.22 0.22 0.22 0.55 0.55 0.55 0.55 0.55 0.55 0.55 0.55 0.55 0.55 0.55 0.55 0.55 0.55 0.55 0.55 0.55 0.55 0.55 0.55 0.55 0.55 0.55 0.55 0.165 0.165 0.14025 0.1155 0.09075 0.066 0.04125 0.0198] 64} > bus :kick > d4
+s :score-snare > note [nil nil :d3 nil nil nil :d3 nil] > grit 0.45 > score-body 0.12 > gain {slow [0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.196 0.196 0.196 0.196 0.196 0.196 0.196 0.196 0.28 0.28 0.28 0.28 0.28 0.28 0.28 0.28 0.084 0.084 0.084 0.084 0.084 0.084 0.084 0.084 0.238 0.238 0.238 0.238 0.238 0.238 0.238 0.238 0.28 0.28 0.28 0.28 0.28 0.28 0.28 0.28 0.28 0.28 0.28 0.28 0.28 0.28 0.28 0.28 0.07 0.07 0.0595 0.049 0.0385 0.028 0.0175 0.0084] 64} > pan 0.48 > d5
+s :score-hat > note [:a5 nil :a5 :a5 nil :a5 :a5 nil] > score-body 0.065 > gain {slow [0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.05 0.05 0.05 0.05 0.05 0.05 0.05 0.05 0.09 0.09 0.09 0.09 0.09 0.09 0.09 0.09 0.025 0.025 0.025 0.025 0.025 0.025 0.025 0.025 0.07 0.07 0.07 0.07 0.07 0.07 0.07 0.07 0.1 0.1 0.1 0.1 0.1 0.1 0.1 0.1 0.085 0.085 0.085 0.085 0.085 0.085 0.085 0.085 0.02 0.02 0.017 0.014 0.011 0.008 0.005 0.0024] 64} > pan 0.64 > d6
+
+# Chord stabs add harmonic motion between the bass and lead.
+s :score-keys > note [:c4 nil nil :c4] > chord changes > voicing > score-color 0.8 > score-softness 0.6 > gain {slow [0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.055 0.055 0.055 0.055 0.055 0.055 0.055 0.055 0.066 0.066 0.066 0.066 0.066 0.066 0.066 0.066 0.0385 0.0385 0.0385 0.0385 0.0385 0.0385 0.0385 0.0385 0.0605 0.0605 0.0605 0.0605 0.0605 0.0605 0.0605 0.0605 0.0715 0.0715 0.0715 0.0715 0.0715 0.0715 0.0715 0.0715 0.055 0.055 0.055 0.055 0.055 0.055 0.055 0.055 0.0165 0.0165 0.01403 0.01155 0.00908 0.0066 0.00413 0.00198] 64} > pan 0.34 > bus :air > d7

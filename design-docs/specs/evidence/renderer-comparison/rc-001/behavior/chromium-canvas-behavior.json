@@ -1,0 +1,61 @@
+{
+  "name": "chromium",
+  "checks": [
+    {
+      "id": "canvas-only-text",
+      "pass": true,
+      "detail": "source chars=25; bridge opacity=0; canvas=767x842; line1=47,0,197,18; colors=343"
+    },
+    {
+      "id": "editing-undo-redo-navigation",
+      "pass": true,
+      "detail": "undo=10; redo=11; home=0; word=8; end=30"
+    },
+    {
+      "id": "clipboard-round-trip",
+      "pass": true,
+      "detail": "canvas-clipboard-evidence"
+    },
+    {
+      "id": "japanese-ime",
+      "pass": true,
+      "detail": "one commit revision=12; Japanese text present"
+    },
+    {
+      "id": "touch-selection",
+      "pass": true,
+      "detail": "{\"selection\":{\"anchor\":30,\"head\":33},\"handles\":2}"
+    },
+    {
+      "id": "context-loss-restore",
+      "pass": true,
+      "detail": "context-lost -> ready"
+    },
+    {
+      "id": "dpr-and-resize",
+      "pass": true,
+      "detail": "{\"actual\":2,\"effective\":2}"
+    },
+    {
+      "id": "visual-viewport-inset",
+      "pass": true,
+      "detail": {
+        "status": "pass",
+        "detail": "bridge bottom=85; inset height=360"
+      }
+    },
+    {
+      "id": "background-no-replay",
+      "pass": true,
+      "detail": "frames hidden=93, resumed=103"
+    },
+    {
+      "id": "dispose-ledger",
+      "pass": true,
+      "detail": "usedBytes=0"
+    }
+  ],
+  "passed": 10,
+  "total": 10,
+  "limitations": []
+}

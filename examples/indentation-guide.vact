@@ -1,0 +1,32 @@
+# Indentation guide: use TAB characters, not spaces, for code indentation.
+# A ':' opens a body one tab deeper. A continued '>' pipeline is one tab
+# deeper than its first line. Dedenting starts the next top-level statement.
+# Play the whole file; all voices are built in, with no sample bank required.
+
+use-bpm 120
+
+# The function body starts at one tab. Its continuation lines use two tabs.
+fn drum-line pitches:
+	s :phase-drum
+		> note pitches
+		> fm-amount 1.4
+		> pitch-sweep 0.7
+		> decay 0.18
+		> gain 0.2
+
+# Four equal steps per cycle, all at C1. 'repeat' avoids writing C1 four times.
+# These top-level pipeline continuations use one tab, not two.
+drum-line {repeat :c1 4}
+	> d1
+
+# One note per cycle: [:g1] repeats next cycle, not on all four beats.
+drum-line [:g1]
+	> pan 0.25
+	> gain 0.12
+	> d2
+
+# nil is a silent step. The nested list subdivides the final step into two.
+drum-line [nil :c3 nil [:c3 :g3]]
+	> pan 0.75
+	> gain 0.08
+	> d3

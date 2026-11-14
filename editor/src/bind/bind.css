@@ -1,0 +1,208 @@
+/* The bind area (design 15.1.6): slider panel, value displays, directive
+   control panel, and the overlay widget in the code view. */
+
+.bind-panel,
+.bind-controls {
+  font: var(--vt-text-sm) var(--vt-font-sans);
+  padding: var(--vt-space-2) var(--vt-space-3);
+  border-top: var(--vt-border-w) solid var(--vt-border);
+}
+
+.bind-panel {
+  overflow-x: auto;
+}
+
+.bind-panel h3,
+.bind-controls h3 {
+  font-size: var(--vt-text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+  margin: var(--vt-space-2) 0 var(--vt-space-1);
+  color: var(--vt-text-muted);
+}
+
+.bind-group[data-empty] {
+  display: none;
+}
+
+.bind-row {
+  display: grid;
+  grid-template-columns: minmax(6rem, 1fr) 7rem 3.5rem auto auto auto auto auto auto auto;
+  column-gap: var(--vt-space-2);
+  row-gap: var(--vt-space-1);
+  align-items: center;
+  height: calc(var(--vt-control-h-compact) + 2 * var(--vt-space-1));
+  box-sizing: border-box;
+  overflow: hidden;
+  white-space: nowrap;
+  padding: var(--vt-space-1) 0;
+}
+
+.bind-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--vt-font-mono);
+}
+
+.bind-select {
+  width: 100%;
+  font: inherit;
+}
+
+.bind-value,
+.bind-name-value {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.bind-tier:empty,
+.bind-state:empty,
+.bind-form:empty,
+.bind-midi:empty,
+.bind-name-badge:empty {
+  display: none;
+}
+
+.bind-tier {
+  font-size: var(--vt-text-xs);
+  color: var(--vt-warn);
+}
+
+.bind-row[data-state='stale'] .bind-state,
+.bind-row[data-state='unbound'] .bind-state {
+  color: var(--vt-danger);
+  font-weight: 600;
+}
+
+.bind-row[data-state='stale'],
+.bind-row[data-state='unbound'] {
+  color: var(--vt-text-muted);
+}
+
+.bind-form,
+.bind-name-badge {
+  font-size: var(--vt-text-xs);
+  color: var(--vt-danger);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bind-midi {
+  font-size: var(--vt-text-xs);
+  color: var(--vt-data-1);
+}
+
+.bind-row .vact-icon-button,
+.bind-controls .vact-icon-button {
+  padding: 0;
+  width: var(--vt-control-h-compact);
+  height: var(--vt-control-h-compact);
+}
+
+.bind-name {
+  display: flex;
+  gap: var(--vt-space-2);
+  height: calc(var(--vt-control-h-compact) + 2 * var(--vt-space-1));
+  box-sizing: border-box;
+  overflow: hidden;
+  white-space: nowrap;
+  padding: var(--vt-space-1) 0;
+}
+
+.bind-name-label {
+  font-family: var(--vt-font-mono);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bind-spacer {
+  padding: 0;
+  border: 0;
+  pointer-events: none;
+}
+
+.bind-controls-header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--vt-space-2);
+  align-items: center;
+  min-height: var(--vt-control-h);
+}
+
+.bind-controls-header h3 {
+  margin: 0;
+}
+
+.bind-notice:empty {
+  display: none;
+}
+
+.bind-notice {
+  color: var(--vt-warn);
+  font-size: var(--vt-text-xs);
+}
+
+.vact-glide-setting {
+  display: grid;
+  grid-template-columns: auto 5rem minmax(6rem, 1fr);
+  align-items: center;
+  gap: var(--vt-space-2);
+  padding: var(--vt-space-2) var(--vt-space-3);
+  color: var(--vt-text-muted);
+  font: var(--vt-text-xs) var(--vt-font-sans);
+}
+
+.vact-glide-setting input {
+  min-width: 0;
+  min-height: var(--vt-control-h-compact);
+  box-sizing: border-box;
+  border: var(--vt-border-w) solid var(--vt-border);
+  border-radius: 0;
+  background: var(--vt-surface);
+  color: var(--vt-text);
+  font: inherit;
+}
+
+@media (pointer: coarse) {
+  .vact-glide-setting input { min-height: 36px; }
+}
+
+.bind-ctl-group h4 {
+  margin: var(--vt-space-1) 0 0;
+  font-size: var(--vt-text-xs);
+  color: var(--vt-text-muted);
+}
+
+.bind-ctl-entry {
+  padding-left: var(--vt-space-1);
+  border-left: 2px solid var(--vt-border-strong);
+  margin: var(--vt-space-1) 0;
+}
+
+.bind-ctl-entry[data-diagnostic] {
+  border-left-color: var(--vt-danger);
+}
+
+.bind-ctl-text {
+  font-family: var(--vt-font-mono);
+  color: var(--vt-syn-directive);
+}
+
+.bind-ctl-marker {
+  color: var(--vt-danger);
+  font-size: var(--vt-text-xs);
+}
+
+.bind-ctl-binding {
+  padding-left: var(--vt-space-1);
+  font-family: var(--vt-font-mono);
+}
+
+.bind-overlay {
+  color: var(--vt-data-1);
+  font-style: italic;
+}

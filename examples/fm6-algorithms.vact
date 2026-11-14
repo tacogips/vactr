@@ -1,0 +1,18 @@
+# Algorithm 0 keeps the legacy two-operator fm voice; 1 through 32 select six-operator topologies.
+# Ratio, index and velocity shape the macro operators. The patch below is hand-written for vactr.
+use-bpm 120
+
+s :fm > note [:c4 :eb4 :g4 :bb4] > algorithm [0 1 5 32] > ratio 2 > index 3 > velocity 0.8 > gain 0.24 > d1
+
+# Operator blocks are in DX7 order (6 to 1), 21 values each; the global tail has 29 values.
+# This original hand-written patch stores algorithm 5 as zero-based value 4.
+let epiano-patch [ 99 99 80 70 99 85 60 0 50 0 0 0 0 2 0 3 78 0 1 0 7 99 90 65 50 99 80 50 0 50 0 0 0 0 1 0 2 82 0 1 0 7 99 90 65 50 99 80 50 0 50 0 0 0 0 1 0 2 82 0 1 0 7 99 90 65 50 99 80 50 0 50 0 0 0 0 1 0 2 82 0 1 0 7 99 99 90 75 99 90 70 0 50 0 0 0 0 2 0 3 0 0 2 0 7 99 99 90 75 99 90 70 0 50 0 0 0 0 2 0 3 0 0 3 0 7 99 99 99 99 99 99 99 99 4 3 1 40 0 0 0 1 0 0 24 0 0 0 0 0 0 0 0 0 0 ]
+
+inst my-epiano:
+	fm6-core freq velocity: velocity patch: epiano-patch > * amp
+
+s :my-epiano > note [:c4 :eb4 :g4 :bb4] > gain 0.12 > d2
+
+# User supplied SysEx import (native host):
+# let bank fm6-sysex ./my-bank.syx
+# inst from-bank: fm6-core freq patch: {bank 0} > * amp

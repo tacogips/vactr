@@ -1,0 +1,8 @@
+# Rolling rumble techno at 128 BPM: a reese bass through existing effects.
+use-bpm 128
+
+# Four-on-the-floor kick.
+s :phase-drum > note [:c1 :c1 :c1 :c1] > fm-amount 1.5 > pitch-sweep 0.72 > decay 0.34 > drive 0.3 > gain 0.34 > d1
+
+# Sixteenth-note reese rumble; the room and low-pass are existing voice effects.
+s :reese-bass > note [:c1 :c1 :c1 :c1 :c1 :c1 :c1 :c1 :c1 :c1 :c1 :c1 :c1 :c1 :c1 :c1] > gate-length 1.2 > cutoff 420 > room 0.28 > size 0.62 > lpf 900 > gain 0.28 > d2

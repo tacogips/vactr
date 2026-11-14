@@ -1,0 +1,34 @@
+==================
+paths urls and literals
+==================
+let paths ./a ../b ~/c /d https://example.test/a?q=1
+let numbers 1 2.5 1/4 -3 -0.5
+let names _ _1 foo.bar a->b
+---
+
+(source_file
+  (statement
+    (identifier)
+    (identifier)
+    (path)
+    (path)
+    (path)
+    (path)
+    (url))
+  (statement
+    (identifier)
+    (identifier)
+    (number)
+    (number)
+    (number)
+    (number)
+    (number))
+  (statement
+    (identifier)
+    (identifier)
+    (wildcard)
+    (console_register)
+    (qualified_identifier)
+    (identifier)
+    (operator)
+    (identifier)))

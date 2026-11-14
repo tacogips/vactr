@@ -1,0 +1,5 @@
+# sample comment
+#@ sample directive
+let sample { if :symbol 1/4 ./path https://example.test }
+inst voice:
+	let value "text \" {nested {inside}} # }"

@@ -1,0 +1,637 @@
+{
+  "taskId": "vim-mode",
+  "workflowMode": "issue-resolution",
+  "implementationBranch": "wf/vim-mode",
+  "baseBranch": "wf/vim-mode",
+  "remote": "origin",
+  "originalHead": "e878431b2aec078b97f1d8c9541f138749030bb6",
+  "issueReference": "inline-workflow-input: 'Add an optional Vim mode to the vactr code editor' (continuation workflowExecutionId opus-luna-design-and-implement-review-loop-session-391 resuming session-388, session-385, session-381 and session-374; session-374 intake comm-006526, design accepted comm-006530, plan review accepted comm-006534 with PR-VIM-1 and PR-VIM-2 verified-repaired; prior high finding step3-design-review-attempt-1-finding-1 repaired in design sections 3.3.1-3.3.3, 4.14 and 8.2; prior high finding opus-luna-design-and-implement-review-loop-session-381-integration-review-attempt-1-finding-1 (Chromium normal-mode IME commit inserts text, editor/src/code/input.ts:44) routed to VIM-15 and re-verified by VIM-40; no GitHub issue number)",
+  "resumeContext": {
+    "previousManifestHead": "f9bd88e49f6e876a74acabcba662525f372a9db6",
+    "partialImplementationCommit": "12f2d7988d44c938d24f9dd1c4674e38380dc9e2",
+    "ownerDiagnosisCommit": "e878431b2aec078b97f1d8c9541f138749030bb6",
+    "earlierPartialImplementationCommits": [
+      "08c2fb6382286f97fcca6d2c063910b32eb80436",
+      "ee90e1eb05c45763650b6c624121c601843c393b",
+      "84234f86eb079e206413925074e97d430917b126"
+    ],
+    "session388Notes": "Session-388 committed checkpoint 12f2d79 with VIM-40 reported blocked on the Chromium normal-mode IME commit. The owner diagnosis (e878431, VIM-40 Progress Log) found the blocker was a stale editor/dist built before later editor/src changes; with input.ts unchanged and a fresh VACTR_REQUIRE_SESSION_ABI=1 npm run build, npm run e2e --browser all --profile behavior passed 32/32 including vim-ime-normal in Chromium and WebKit. No input.ts change is needed. VIM-40 must rebuild editor/dist after the last source change and immediately before the e2e gate. The VIM20 cw handoff (VIM10-ADV-3) is recorded as done in the VIM-20 Progress Log, pending independent review. The session-388 integration review left one open mid finding, IR-388-VIM30-EVIDENCE, routed to VIM-30. VIM-30 must re-run its full verification into a new attempt directory against the current vim-mount.ts, record the sha256 of every owned file, and pass the Step 6 test-integrity and Step 7 adversarial review gates. All 14 plans stay in the remaining set because no plan has a recorded independent acceptance decision from session-388. Implementers resume from the committed files, re-run their plan verification into tmp/vim-mode/<planId>/attempt-<n>/ and append a session-391 Progress Log entry.",
+    "notes": "Session-385 stopped on a backend failure and committed checkpoint 08c2fb6. In that run VIM-15 applied the session-381 Chromium normal-mode IME repair (input.ts discard latch survives blur/refocus until compositionend; 23 input-vim-hook cases, 103/103 focused tests) pending independent re-review and the VIM-40 Chromium vim-ime-normal re-check; VIM-10 repaired VIM10-ADV-3 (e/E grapheme-forward algorithm) and handed a cw follow-up to VIM-20 (controller.ts count-1 cw must keep Vim single-character change on a one-grapheme word such as 'a bc' and must not over-change at the final grapheme of a multi-grapheme word such as 'ab cd' at b); VIM-12 repaired VIM12-ADV-04 (uppercase register append concatenates macro tokens) and corrected the qA replay expectation in macro-marks.test.ts. Current self-reported statuses: VIM-00, 12, 13, 14, 15, 16, 17, 18, 41 Completed; VIM-10, 11, 20, 30 In Progress; VIM-40 Ready/In Progress. Not every plan has passed independent Opus review, so all 14 plans stay in the remaining set. Implementers resume from the committed files: re-read them, finish missing criteria, apply routed repairs and handoffs, re-run the plan verification into a new tmp/vim-mode/<planId>/attempt-<n>/ directory, and append a session-388 Progress Log entry. Do not discard committed work."
+  },
+  "designDocPaths": [
+    "design-docs/specs/design-vim-mode.md",
+    "design-docs/specs/architecture.md",
+    "design-docs/user-qa/pending-vim-mode-questions.md",
+    "design-docs/user-qa/README.md"
+  ],
+  "evidenceRoot": "tmp/vim-mode",
+  "evidenceLayout": "tmp/vim-mode/<planId>/ per plan (scoped tsconfig.json, command logs ending with exit=<status>), with per-attempt subdirectories tmp/vim-mode/<planId>/attempt-<n>/; tmp/vim-mode/e2e/vim-001/ for the Playwright behavior run; tmp/ui-style/after/ for the style test. tmp/ is gitignored. Each Progress Log records {command, exitStatus: 0, testsRun, testsPassed, failureCount: 0, outcome: \"passed\", log, notes}; negative controls go only in mutationEvidence.",
+  "reviewContext": {
+    "issueReference": "inline-workflow-input: 'Add an optional Vim mode to the vactr code editor' (workflowExecutionId opus-luna-design-and-implement-review-loop-session-391, continuing session-388, session-385, session-381 and session-374; design accepted comm-006530; plan review accepted comm-006534; no GitHub issue number)",
+    "priorReviewFindings": [
+      {
+        "id": "opus-luna-design-and-implement-review-loop-session-381-integration-review-attempt-1-finding-1",
+        "severity": "high",
+        "workflowMode": "issue-resolution",
+        "sourceReviewStepId": "integration-review",
+        "filePath": "editor/src/code/input.ts",
+        "line": 44,
+        "message": "In Chromium, a normal-mode IME commit inserts text: 'stable' (revision 2) becomes 'stabl日本e' (revision 3) after CDP Input.imeSetComposition('にほん') then Input.insertText('日本'). The Vim text-input gate is checked only in the compositionstart handler (input.ts:42). The blur handler (input.ts:78-81) clears discarding during the microtask blur/refocus queued at input.ts:44. After that, compositionupdate (input.ts:49), the beforeInput isComposing branch (input.ts:185-188) and updateComposition (input.ts:152) call beginComposition() with no Vim gate, and compositionend calls endComposition() (input.ts:52), which dispatches the commit at the caret.",
+        "owningPlan": "VIM-15",
+        "reverifyingPlan": "VIM-40",
+        "requiredRepair": "While the Vim hook is set and allowsTextInput() is false, no composition path may start a composition or dispatch: beginComposition() (and so updateComposition and the beforeInput isComposing branch) must not begin, and endComposition() must not dispatch. The blur/refocus that ends the platform composition must not reopen any path that commits text. Insert-mode and Vim-off composition behavior stays byte-identical. Add input-vim-hook.test.ts regressions that replay the Chromium order (compositionstart, microtask blur/refocus, compositionupdate, beforeinput isComposing insertCompositionText, compositionend '日本') and assert the document and revision are unchanged; then the VIM-40 Chromium vim-ime-normal check must pass.",
+        "session385State": "Repair committed in 08c2fb6 (VIM-15 Progress Log 'Step 6 IME repair rerun'); pending independent re-review and the VIM-40 Chromium vim-ime-normal re-check.",
+        "session388State": "Owner diagnosis e878431: the session-388 vim-ime-normal failure came from a stale editor/dist. A fresh build passes the behavior e2e 32/32 in Chromium and WebKit with input.ts unchanged. VIM-40 must re-run gate 3 (build) after the last source change and then gate 6 under the measurement lock, recording exit status and the complete log."
+      },
+      {
+        "id": "opus-luna-design-and-implement-review-loop-session-388-integration-review-attempt-1-finding-1",
+        "severity": "mid",
+        "workflowMode": "issue-resolution",
+        "sourceReviewStepId": "integration-review",
+        "sourceStepExecutionId": "integration-review-attempt-1-exec-5425",
+        "filePath": "tmp/vim-mode/VIM-30",
+        "message": "IR-388-VIM30-EVIDENCE: VIM-30 cannot be accepted. No Vitest run exists against the final vim-mount.ts (sha256 840a1bdc), and the Step 6 test-integrity and Step 7 adversarial review decisions for VIM-30 do not exist. The type-stripped runtime-equivalence proof narrows the risk but does not replace the required gates.",
+        "owningPlan": "VIM-30",
+        "requiredRepair": "Re-run every VIM-30 verification command against the current tree into a new tmp/vim-mode/VIM-30/attempt-<n>/ directory (the focused Vitest list under the measurement lock), with complete logs ending in the exit status. Record the sha256 of editor/src/code/vim-mount.ts and every other VIM-30 owned file in that attempt and confirm the hashes match the tree the logs ran against. Then pass the Step 6 test-integrity and Step 7 adversarial review gates for VIM-30, and record both decisions in the VIM-30 Progress Log."
+      }
+    ],
+    "pendingHandoffs": [
+      {
+        "id": "VIM10-ADV-3-cw-handoff",
+        "fromPlan": "VIM-10",
+        "owningPlan": "VIM-20",
+        "filePath": "editor/src/code/vim/controller.ts",
+        "requiredChange": "With e/E repaired to the grapheme-forward algorithm, count-1 cw must still change only the single character on a one-grapheme word ('a bc' at a) and must change only to the end of the current word when the cursor is on its final grapheme ('ab cd' at b); add controller.test.ts regressions for both.",
+        "session388State": "Recorded done in the VIM-20 Progress Log ('Step 6 VIM10-ADV-3 cw handoff' and 'Step 6 repair VIM20-TI-1'), pending independent review."
+      }
+    ],
+    "userProblem": "The vactr editor code pane (WebGL canvas renderer, hidden-textarea input bridge, @codemirror/state EditorState as the only document authority, no EditorView) has no Vim mode, and @replit/codemirror-vim cannot be used because it requires an EditorView.",
+    "requiredOutcomes": [
+      "Opt-in Vim toggle in the transport bar, default off, remembered per viewer through try/catch-wrapped localStorage",
+      "Modes normal, insert, replace, visual charwise, visual linewise and operator-pending with the motions, operators, text objects, registers (unnamed, a-z/A-Z, 0, _, + and * through the async Clipboard API), counts, dot repeat, marks, macros and ex commands in design section 2.1",
+      "Undo/redo through the existing history with one insert session as one undo step",
+      "Live-coding shortcuts (evaluate, hush, format Shift-Alt-f, completion navigation) work in every mode; Escape closes the completion popup first; Ctrl-[ aliases Escape",
+      "Normal mode never inserts text from IME/keyCode 229 keystrokes; insert-mode IME composition is unchanged",
+      "Block/bar/underline cursor through a narrow renderer hook; a flat, square mode indicator with pending state announced through the live region",
+      "Toggle off: behavior and tests identical to before",
+      "Gates pass: npm run check, full vitest, npm run test:style, npm run build with VACTR_REQUIRE_SESSION_ABI=1, and the vim Playwright e2e"
+    ],
+    "nonGoals": [
+      "Visual block Ctrl-v (VQ1)",
+      "Search-match highlighting / hlsearch (VQ3)",
+      "Numbered registers 1-9, small-delete -, read-only registers, insert-mode Ctrl-r/Ctrl-o/Ctrl-w/Ctrl-d/Ctrl-t, gv, gi, it/at, :g, :normal, user mappings/vimrc, ex history, incremental search, the substitute c flag (VQ4)",
+      "Folding, windows, buffers and tabs",
+      "A CodeMirror EditorView or @replit/codemirror-vim",
+      "New npm/cargo dependencies or Tauri capability changes",
+      "Rust changes"
+    ],
+    "constraints": [
+      "Work only in this worktree on wf/vim-mode; never touch other worktrees or main; never kill processes the worker did not start",
+      "English only, no emojis, no tool attribution in commits; every touched source file stays under 1000 lines",
+      "UI style: solid, flat, square (radius 0), spaced, token-only, never a native widget look",
+      "Renderer change limited to the cursor-shape hook (at most 12 changed lines in renderer.ts); atlas.ts untouched because sibling branch wf/code-render edits atlas.ts and renderer.ts",
+      "Full vitest, npm run test:style and the Playwright e2e (VIM-40 measureLockedVerification) run under the measurement lock: mkdir /Users/taco/gits/tacogips/vactr-worktrees/.measure-lock before and rmdir after; wait and retry if it exists",
+      "Verification records use exactly {command, exitStatus: 0, testsRun, testsPassed, failureCount: 0, outcome: \"passed\", log, notes}; negative controls go only in mutationEvidence",
+      "Vim behavior is written from scratch; any adapted permissive code is recorded in THIRD_PARTY_NOTICES.md; no GPL code",
+      "Per-plan evidence goes under tmp/vim-mode/<planId>/ (untracked); the scoped tsconfig.json there is a regenerated verification scaffold, not shipped source"
+    ],
+    "designDecisionsAndRationale": [
+      "Pure DOM-free Vim core under editor/src/code/vim/ producing TransactionSpecs, selection changes and host actions, because no EditorView exists and the core must be table-testable",
+      "A thin adapter (vim-mount.ts) connects the core to InputController, CodeSurface, the clipboard, eval/format actions and the live region; when off no Vim object exists and the routing order is unchanged",
+      "The pass-through set for live-coding shortcuts is checked before Vim consumption in every mode (design 3.3.1): P1 registered 'default' surface keymaps via a read-only matchesKeymap query using the platform Mod rule (Meta on Apple, Ctrl elsewhere), P2 KeyboardController shortcuts for both Meta and Ctrl, P3 clipboard and shell chords; this repairs the session-374 high finding that Ctrl-Enter/Ctrl-./Ctrl-a/Ctrl-z/Ctrl-y were swallowed on Windows/Linux",
+      "Non-insert modes consume every key outside P, including Backspace/Delete/Tab with any modifier, so KeyboardController's modifier-agnostic delete branch is unreachable there (design 3.3.3)",
+      "The text-input gate discards normal-mode composition/keyCode 229 input, and blur/refocus terminates composition (VQ5)",
+      "Cursor shape is a RenderFeedback field drawn through cursorRect, keeping renderer edits minimal",
+      "Every real session exit records an <Esc> token in the macro and redo records; dot replay always ends in normal mode with nothing pending; visual-mode changes do not start a redo record (PR-VIM-1 repair)",
+      "Search uses the JS RegExp dialect (VQ6); the desired column is measured in graphemes (VQ7); the browser Clipboard API is used without a Tauri plugin, with a graceful fallback (VQ8)",
+      "Ex :w/:q/:wq/:x/:q! are no-ops with a message; :eval/:evalall/:run/:hush/:format map vactr actions (VQ2)"
+    ],
+    "intentionalTradeoffs": [
+      "Visual block and hlsearch are deferred to keep renderer changes cursor-only",
+      "Replace-mode overwrite applies only on a cancelable beforeinput insertText; platforms that deliver typing only through the input diff fall back to inserting",
+      "A replace-mode IME commit inserts rather than overwrites (VQ9)",
+      "The release wasm is absent locally, so the build gate uses the debug wasm through VACTR_WASM and records that",
+      "test:style and Playwright may need the serial Opus verification step if the Codex sandbox denies the localhost bind (recorded as a verificationGap)"
+    ],
+    "supportedEdgeCases": [
+      "Counts on motions, operators, inserts (3ihi<Esc> -> hihihi) and dot repeat",
+      "ciwbar<Esc>w. and dw then vjd then . redo semantics",
+      "Macro recording with insert sessions (qaA;<Esc>jq then gg@a)",
+      "Escape or Ctrl-[ with an open completion popup closes the popup only and records nothing",
+      "A-Z register append, black hole _, the 0 yank register, + and * clipboard with fallback",
+      "j/k desired column across short lines",
+      "Japanese IME keystrokes in normal mode never mutate the document",
+      "Chromium normal-mode IME: a composition that continues after the discard blur/refocus (compositionupdate, beforeinput isComposing, compositionend with data) still never dispatches",
+      "iPad on-screen typing stays usable; Vim applies to hardware keyboards; the toggle stays reachable"
+    ],
+    "outOfScopeEdgeCases": [
+      "WebKit/iPad composition termination beyond the VIM-40 e2e (a physical device check is pending)",
+      "Incremental search and search highlighting",
+      "Multi-buffer/window behavior"
+    ],
+    "sourcePaths": [
+      "design-docs/specs/design-vim-mode.md",
+      "design-docs/specs/architecture.md",
+      "design-docs/user-qa/pending-vim-mode-questions.md",
+      "design-docs/user-qa/README.md",
+      "impl-plans/README.md",
+      "impl-plans/active/vim-mode-00-contract.md",
+      "impl-plans/active/vim-mode-10-motions.md",
+      "impl-plans/active/vim-mode-11-textobjects.md",
+      "impl-plans/active/vim-mode-12-operators-registers.md",
+      "impl-plans/active/vim-mode-13-search-ex.md",
+      "impl-plans/active/vim-mode-14-record-undo-marks.md",
+      "impl-plans/active/vim-mode-15-input-routing.md",
+      "impl-plans/active/vim-mode-16-cursor-shape.md",
+      "impl-plans/active/vim-mode-17-ui.md",
+      "impl-plans/active/vim-mode-18-parser.md",
+      "impl-plans/active/vim-mode-20-controller.md",
+      "impl-plans/active/vim-mode-30-mount.md",
+      "impl-plans/active/vim-mode-40-e2e-verify.md",
+      "impl-plans/active/vim-mode-41-docs.md",
+      "editor/src/code/input.ts",
+      "editor/src/code/surface.ts",
+      "editor/src/code/keyboard.ts",
+      "editor/src/code/history.ts",
+      "editor/src/code/renderer.ts",
+      "editor/src/code/mount.ts"
+    ]
+  },
+  "waves": [
+    ["VIM-00"],
+    ["VIM-10", "VIM-11", "VIM-12", "VIM-13", "VIM-14", "VIM-15", "VIM-16", "VIM-17", "VIM-18"],
+    ["VIM-20"],
+    ["VIM-30"],
+    ["VIM-40", "VIM-41"]
+  ],
+  "plans": [
+    {
+      "planId": "VIM-00",
+      "planPath": "impl-plans/active/vim-mode-00-contract.md",
+      "dependsOn": [],
+      "writePaths": [
+        "editor/src/code/vim/types.ts",
+        "editor/src/code/vim/keys.ts",
+        "editor/src/code/vim/words.ts",
+        "editor/test/code/vim/host.ts",
+        "editor/test/code/vim/keys.test.ts",
+        "editor/test/code/vim/words.test.ts",
+        "editor/test/code/vim/purity.test.ts",
+        "impl-plans/active/vim-mode-00-contract.md",
+        "target",
+        "tree-sitter-vact/tree-sitter-vact.wasm",
+        "editor/node_modules",
+        "tmp/vim-mode/VIM-00"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tree-sitter-vact/tree-sitter-vact.wasm", "editor/node_modules", "tmp/vim-mode/VIM-00"],
+      "acceptanceCriteria": [
+        "types.ts, keys.ts and words.ts export exactly the pinned names with the stated signatures",
+        "keys.test.ts, words.test.ts and purity.test.ts pass with at least 30 test cases in total",
+        "The scoped typecheck passes"
+      ],
+      "verification": [
+        "cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-mode/VIM-00/tsconfig.json",
+        "cd editor && ./node_modules/.bin/vitest run test/code/vim/keys.test.ts test/code/vim/words.test.ts test/code/vim/purity.test.ts"
+      ]
+    },
+    {
+      "planId": "VIM-10",
+      "planPath": "impl-plans/active/vim-mode-10-motions.md",
+      "dependsOn": ["VIM-00"],
+      "writePaths": [
+        "editor/src/code/vim/motions.ts",
+        "editor/test/code/vim/motions.test.ts",
+        "impl-plans/active/vim-mode-10-motions.md",
+        "target",
+        "tree-sitter-vact/tree-sitter-vact.wasm",
+        "editor/node_modules",
+        "tmp/vim-mode/VIM-10"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tree-sitter-vact/tree-sitter-vact.wasm", "editor/node_modules", "tmp/vim-mode/VIM-10"],
+      "acceptanceCriteria": [
+        "runMotion handles all 34 MotionKind values with the results in the plan table",
+        "motions.test.ts has at least 60 passing cases",
+        "motions.ts is under 450 lines and the purity test passes"
+      ],
+      "verification": [
+        "cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-mode/VIM-10/tsconfig.json",
+        "cd editor && ./node_modules/.bin/vitest run test/code/vim/motions.test.ts test/code/vim/purity.test.ts"
+      ]
+    },
+    {
+      "planId": "VIM-11",
+      "planPath": "impl-plans/active/vim-mode-11-textobjects.md",
+      "dependsOn": ["VIM-00"],
+      "writePaths": [
+        "editor/src/code/vim/textobjects.ts",
+        "editor/test/code/vim/textobjects.test.ts",
+        "impl-plans/active/vim-mode-11-textobjects.md",
+        "target",
+        "tree-sitter-vact/tree-sitter-vact.wasm",
+        "editor/node_modules",
+        "tmp/vim-mode/VIM-11"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tree-sitter-vact/tree-sitter-vact.wasm", "editor/node_modules", "tmp/vim-mode/VIM-11"],
+      "acceptanceCriteria": [
+        "All 9 TextObjectKind values are handled for both i and a",
+        "At least 30 test cases pass",
+        "textobjects.ts is under 300 lines and the purity test passes"
+      ],
+      "verification": [
+        "cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-mode/VIM-11/tsconfig.json",
+        "cd editor && ./node_modules/.bin/vitest run test/code/vim/textobjects.test.ts test/code/vim/purity.test.ts"
+      ]
+    },
+    {
+      "planId": "VIM-12",
+      "planPath": "impl-plans/active/vim-mode-12-operators-registers.md",
+      "dependsOn": ["VIM-00"],
+      "writePaths": [
+        "editor/src/code/vim/operators.ts",
+        "editor/src/code/vim/registers.ts",
+        "editor/test/code/vim/operators.test.ts",
+        "editor/test/code/vim/registers.test.ts",
+        "impl-plans/active/vim-mode-12-operators-registers.md",
+        "target",
+        "tree-sitter-vact/tree-sitter-vact.wasm",
+        "editor/node_modules",
+        "tmp/vim-mode/VIM-12"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tree-sitter-vact/tree-sitter-vact.wasm", "editor/node_modules", "tmp/vim-mode/VIM-12"],
+      "acceptanceCriteria": [
+        "Every export pinned in VIM-00 for operators.ts and registers.ts exists with that signature",
+        "At least 55 tests pass across both test files",
+        "Each file is under its line budget and the purity test passes"
+      ],
+      "verification": [
+        "cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-mode/VIM-12/tsconfig.json",
+        "cd editor && ./node_modules/.bin/vitest run test/code/vim/operators.test.ts test/code/vim/registers.test.ts test/code/vim/purity.test.ts"
+      ]
+    },
+    {
+      "planId": "VIM-13",
+      "planPath": "impl-plans/active/vim-mode-13-search-ex.md",
+      "dependsOn": ["VIM-00"],
+      "writePaths": [
+        "editor/src/code/vim/search.ts",
+        "editor/src/code/vim/ex.ts",
+        "editor/test/code/vim/search-ex.test.ts",
+        "impl-plans/active/vim-mode-13-search-ex.md",
+        "target",
+        "tree-sitter-vact/tree-sitter-vact.wasm",
+        "editor/node_modules",
+        "tmp/vim-mode/VIM-13"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tree-sitter-vact/tree-sitter-vact.wasm", "editor/node_modules", "tmp/vim-mode/VIM-13"],
+      "acceptanceCriteria": [
+        "The pinned exports and the ExCommand/ExContext types exist",
+        "At least 40 tests pass",
+        "search.ts and ex.ts are under 250 lines each and the purity test passes"
+      ],
+      "verification": [
+        "cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-mode/VIM-13/tsconfig.json",
+        "cd editor && ./node_modules/.bin/vitest run test/code/vim/search-ex.test.ts test/code/vim/purity.test.ts"
+      ]
+    },
+    {
+      "planId": "VIM-14",
+      "planPath": "impl-plans/active/vim-mode-14-record-undo-marks.md",
+      "dependsOn": ["VIM-00"],
+      "writePaths": [
+        "editor/src/code/vim/undo.ts",
+        "editor/src/code/vim/record.ts",
+        "editor/src/code/vim/marks.ts",
+        "editor/test/code/vim/undo.test.ts",
+        "editor/test/code/vim/record.test.ts",
+        "editor/test/code/vim/marks.test.ts",
+        "impl-plans/active/vim-mode-14-record-undo-marks.md",
+        "target",
+        "tree-sitter-vact/tree-sitter-vact.wasm",
+        "editor/node_modules",
+        "tmp/vim-mode/VIM-14"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tree-sitter-vact/tree-sitter-vact.wasm", "editor/node_modules", "tmp/vim-mode/VIM-14"],
+      "acceptanceCriteria": [
+        "The pinned exports exist with those signatures",
+        "At least 28 tests pass across the three test files",
+        "Each file is within budget and the purity test passes"
+      ],
+      "verification": [
+        "cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-mode/VIM-14/tsconfig.json",
+        "cd editor && ./node_modules/.bin/vitest run test/code/vim/undo.test.ts test/code/vim/record.test.ts test/code/vim/marks.test.ts test/code/vim/purity.test.ts"
+      ]
+    },
+    {
+      "planId": "VIM-15",
+      "planPath": "impl-plans/active/vim-mode-15-input-routing.md",
+      "dependsOn": ["VIM-00"],
+      "writePaths": [
+        "editor/src/code/input.ts",
+        "editor/src/code/surface.ts",
+        "editor/test/canvas/input-vim-hook.test.ts",
+        "impl-plans/active/vim-mode-15-input-routing.md",
+        "target",
+        "tree-sitter-vact/tree-sitter-vact.wasm",
+        "editor/node_modules",
+        "tmp/vim-mode/VIM-15"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tree-sitter-vact/tree-sitter-vact.wasm", "editor/node_modules", "tmp/vim-mode/VIM-15"],
+      "acceptanceCriteria": [
+        "setVim, the routing, the text-input gate, normal-mode IME discarding and replace overwrite are implemented as specified",
+        "matchesKeymap and the runKeymaps precedence filter exist",
+        "input-vim-hook.test.ts has at least 18 passing cases and input.test.ts passes unmodified",
+        "Repair of session-381 integration-review finding 1: with the gate closed, no composition path (compositionupdate, beforeinput isComposing, updateComposition, compositionend) begins a composition or dispatches, including after the discard blur/refocus; regression cases replaying the Chromium event order assert unchanged document and revision",
+        "input.ts is under 300 lines and surface.ts under 220"
+      ],
+      "verification": [
+        "cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-mode/VIM-15/tsconfig.json",
+        "cd editor && ./node_modules/.bin/vitest run test/canvas/input-vim-hook.test.ts test/canvas/input.test.ts test/canvas/state.test.ts test/code/completion-view.test.ts test/code/eval.test.ts test/code/format.test.ts"
+      ]
+    },
+    {
+      "planId": "VIM-16",
+      "planPath": "impl-plans/active/vim-mode-16-cursor-shape.md",
+      "dependsOn": ["VIM-00"],
+      "writePaths": [
+        "editor/src/code/cursor-shape.ts",
+        "editor/src/code/renderer.ts",
+        "editor/test/canvas/cursor-shape.test.ts",
+        "editor/test/canvas/gpu.test.ts",
+        "impl-plans/active/vim-mode-16-cursor-shape.md",
+        "target",
+        "tree-sitter-vact/tree-sitter-vact.wasm",
+        "editor/node_modules",
+        "tmp/vim-mode/VIM-16"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tree-sitter-vact/tree-sitter-vact.wasm", "editor/node_modules", "tmp/vim-mode/VIM-16"],
+      "acceptanceCriteria": [
+        "cursor-shape.ts exports cursorRect and cursorColor",
+        "The renderer.ts hook is in place with at most 12 changed lines; atlas.ts is untouched",
+        "The new cursor-shape tests pass and the full gpu.test.ts passes"
+      ],
+      "verification": [
+        "cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-mode/VIM-16/tsconfig.json",
+        "cd editor && ./node_modules/.bin/vitest run test/canvas/cursor-shape.test.ts test/canvas/gpu.test.ts",
+        "cd editor && git diff --numstat -- src/code/renderer.ts"
+      ]
+    },
+    {
+      "planId": "VIM-17",
+      "planPath": "impl-plans/active/vim-mode-17-ui.md",
+      "dependsOn": ["VIM-00"],
+      "writePaths": [
+        "editor/src/code/vim-settings.ts",
+        "editor/src/code/vim-clipboard.ts",
+        "editor/src/code/vim-status-view.tsx",
+        "editor/src/code/code.css",
+        "editor/src/app/app.css",
+        "editor/src/ui/transport-view.tsx",
+        "editor/src/code/transport.ts",
+        "editor/test/code/vim-settings.test.ts",
+        "editor/test/code/vim-clipboard.test.ts",
+        "editor/test/ui/vim-status.test.tsx",
+        "editor/test/ui/vim-toggle.test.ts",
+        "impl-plans/active/vim-mode-17-ui.md",
+        "target",
+        "tree-sitter-vact/tree-sitter-vact.wasm",
+        "editor/node_modules",
+        "tmp/vim-mode/VIM-17"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tree-sitter-vact/tree-sitter-vact.wasm", "editor/node_modules", "tmp/vim-mode/VIM-17"],
+      "acceptanceCriteria": [
+        "vim-settings.ts, vim-clipboard.ts and vim-status-view.tsx exist with the exact exports in the plan and the transport option is optional",
+        "At least 25 new tests pass and controls.test.ts and style-tokens.test.ts pass unchanged",
+        "Each new file is under 200 lines; the UI is solid, flat, square (radius 0) and token-only"
+      ],
+      "verification": [
+        "cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-mode/VIM-17/tsconfig.json",
+        "cd editor && ./node_modules/.bin/vitest run test/code/vim-settings.test.ts test/code/vim-clipboard.test.ts test/ui/vim-status.test.tsx test/ui/vim-toggle.test.ts test/ui/controls.test.ts test/ui/style-tokens.test.ts"
+      ]
+    },
+    {
+      "planId": "VIM-18",
+      "planPath": "impl-plans/active/vim-mode-18-parser.md",
+      "dependsOn": ["VIM-00"],
+      "writePaths": [
+        "editor/src/code/vim/parser.ts",
+        "editor/test/code/vim/parser.test.ts",
+        "impl-plans/active/vim-mode-18-parser.md",
+        "target",
+        "tree-sitter-vact/tree-sitter-vact.wasm",
+        "editor/node_modules",
+        "tmp/vim-mode/VIM-18"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tree-sitter-vact/tree-sitter-vact.wasm", "editor/node_modules", "tmp/vim-mode/VIM-18"],
+      "acceptanceCriteria": [
+        "The pinned types and CommandParser methods are exported",
+        "At least 50 test cases pass",
+        "parser.ts is under 350 lines and the purity test passes"
+      ],
+      "verification": [
+        "cd editor && ./node_modules/.bin/tsc --noEmit -p ../tmp/vim-mode/VIM-18/tsconfig.json",
+        "cd editor && ./node_modules/.bin/vitest run test/code/vim/parser.test.ts test/code/vim/purity.test.ts"
+      ]
+    },
+    {
+      "planId": "VIM-20",
+      "planPath": "impl-plans/active/vim-mode-20-controller.md",
+      "dependsOn": ["VIM-10", "VIM-11", "VIM-12", "VIM-13", "VIM-14", "VIM-18"],
+      "writePaths": [
+        "editor/src/code/vim/controller.ts",
+        "editor/src/code/vim/execute.ts",
+        "editor/src/code/vim/session.ts",
+        "editor/test/code/vim/controller.test.ts",
+        "editor/test/code/vim/undo-repeat.test.ts",
+        "editor/test/code/vim/macro-marks.test.ts",
+        "editor/test/code/vim/controller-io.test.ts",
+        "impl-plans/active/vim-mode-20-controller.md",
+        "target",
+        "tree-sitter-vact/tree-sitter-vact.wasm",
+        "editor/node_modules",
+        "tmp/vim-mode/VIM-20"
+      ],
+      "sharedPaths": [
+        "editor/src/code/vim/types.ts",
+        "editor/src/code/vim/keys.ts",
+        "editor/src/code/vim/words.ts",
+        "editor/src/code/vim/motions.ts",
+        "editor/src/code/vim/textobjects.ts",
+        "editor/src/code/vim/operators.ts",
+        "editor/src/code/vim/registers.ts",
+        "editor/src/code/vim/search.ts",
+        "editor/src/code/vim/ex.ts",
+        "editor/src/code/vim/undo.ts",
+        "editor/src/code/vim/record.ts",
+        "editor/src/code/vim/marks.ts",
+        "editor/src/code/vim/parser.ts",
+        "editor/test/code/vim/host.ts",
+        "editor/test/code/vim/motions.test.ts",
+        "editor/test/code/vim/textobjects.test.ts",
+        "editor/test/code/vim/operators.test.ts",
+        "editor/test/code/vim/registers.test.ts",
+        "editor/test/code/vim/search-ex.test.ts",
+        "editor/test/code/vim/undo.test.ts",
+        "editor/test/code/vim/record.test.ts",
+        "editor/test/code/vim/marks.test.ts",
+        "editor/test/code/vim/parser.test.ts"
+      ],
+      "sharedPathNotes": [
+        { "path": "editor/src/code/vim/types.ts", "intendedEdit": "Only additive type exports if the controller needs one; never rename pinned fields." },
+        { "path": "editor/test/code/vim/host.ts", "intendedEdit": "Additive helpers for controller tests (key-string to VimKeyInput, simulated typing); existing helpers unchanged." },
+        { "path": "editor/src/code/vim/motions.ts", "intendedEdit": "Cross-plan repair only, each with a regression test in the module's own test file and a Progress Log entry; same rule for every other shared module/test path." }
+      ],
+      "artifactRoots": ["target", "tree-sitter-vact/tree-sitter-vact.wasm", "editor/node_modules", "tmp/vim-mode/VIM-20"],
+      "acceptanceCriteria": [
+        "VimController exposes exactly the public API in the plan and implements VimInputHook",
+        "At least 146 new tests pass across controller, undo-repeat, macro-marks and controller-io tests (80 + 21 + 15 + 30) and all wave-1 vim tests still pass",
+        "Every session exit records an <Esc> key token (except during replay), . always ends in normal mode with nothing pending, and visual-mode changes do not begin a redo record",
+        "VIM10-ADV-3 cw handoff: count-1 cw changes only the single character on a one-grapheme word and only to the word end from the final grapheme of a multi-grapheme word, with controller.test.ts regressions",
+        "npm run check exits 0",
+        "Each new file is within budget and the purity test passes"
+      ],
+      "verification": [
+        "cd editor && npm run check",
+        "cd editor && ./node_modules/.bin/vitest run test/code/vim"
+      ]
+    },
+    {
+      "planId": "VIM-30",
+      "planPath": "impl-plans/active/vim-mode-30-mount.md",
+      "dependsOn": ["VIM-15", "VIM-16", "VIM-17", "VIM-20"],
+      "writePaths": [
+        "editor/src/code/vim-mount.ts",
+        "editor/src/code/mount.ts",
+        "editor/test/canvas/vim-input.test.ts",
+        "editor/test/canvas/vim-mount.test.ts",
+        "editor/test/style/ui-style.mjs",
+        "impl-plans/active/vim-mode-30-mount.md",
+        "target",
+        "tree-sitter-vact/tree-sitter-vact.wasm",
+        "editor/node_modules",
+        "tmp/vim-mode/VIM-30"
+      ],
+      "sharedPaths": [
+        "editor/src/code/input.ts",
+        "editor/src/code/surface.ts",
+        "editor/src/code/renderer.ts",
+        "editor/src/code/cursor-shape.ts",
+        "editor/src/code/vim-status-view.tsx",
+        "editor/src/code/vim-settings.ts",
+        "editor/src/code/vim-clipboard.ts",
+        "editor/src/code/transport.ts",
+        "editor/src/ui/transport-view.tsx",
+        "editor/src/code/code.css",
+        "editor/src/app/app.css",
+        "editor/src/code/vim",
+        "editor/test/code/vim",
+        "editor/test/canvas/input-vim-hook.test.ts",
+        "editor/test/canvas/cursor-shape.test.ts"
+      ],
+      "sharedPathNotes": [
+        { "path": "editor/src/code/vim", "intendedEdit": "Cross-plan repair only (with a regression test in editor/test/code/vim and a Progress Log entry); no new behavior." },
+        { "path": "editor/test/code/vim", "intendedEdit": "Regression tests for VIM-30 cross-plan repairs to editor/src/code/vim only; append new cases, never edit or weaken existing cases." },
+        { "path": "editor/test/canvas/input-vim-hook.test.ts", "intendedEdit": "Regression tests for VIM-30 cross-plan repairs to input.ts or surface.ts only; append new cases, never edit or weaken existing cases." },
+        { "path": "editor/test/canvas/cursor-shape.test.ts", "intendedEdit": "Regression tests for VIM-30 cross-plan repairs to cursor-shape.ts only; append new cases, never edit or weaken existing cases." },
+        { "path": "editor/src/code/code.css", "intendedEdit": "Only layout fixes for the status row found by the integration tests; token-only, radius 0." }
+      ],
+      "artifactRoots": ["target", "tree-sitter-vact/tree-sitter-vact.wasm", "editor/node_modules", "tmp/vim-mode/VIM-30"],
+      "acceptanceCriteria": [
+        "vim-mount.ts exports exactly the planned API and mount.ts is wired in the five listed places",
+        "At least 35 new tests pass in vim-input.test.ts and vim-mount.test.ts",
+        "npm run check exits 0",
+        "node --check test/style/ui-style.mjs exits 0",
+        "With Vim mode off, existing editor tests and behavior are unchanged",
+        "Repair of IR-388-VIM30-EVIDENCE: a new tmp/vim-mode/VIM-30/attempt-<n>/ holds complete passing logs for every verification command, run against the current vim-mount.ts, with sha256 values for all owned files matching that tree; the Step 6 test-integrity and Step 7 adversarial review decisions for VIM-30 are recorded in its Progress Log"
+      ],
+      "verification": [
+        "cd editor && npm run check",
+        "cd editor && ./node_modules/.bin/vitest run test/canvas/vim-input.test.ts test/canvas/vim-mount.test.ts test/canvas/input-vim-hook.test.ts test/canvas/cursor-shape.test.ts test/canvas/mount.test.ts test/canvas/input.test.ts test/canvas/first-viewport.test.ts test/canvas/gpu.test.ts test/ui test/code/vim",
+        "cd editor && node --check test/style/ui-style.mjs"
+      ]
+    },
+    {
+      "planId": "VIM-40",
+      "planPath": "impl-plans/active/vim-mode-40-e2e-verify.md",
+      "dependsOn": ["VIM-30"],
+      "writePaths": [
+        "editor/test/e2e/vim-behavior.mjs",
+        "editor/test/e2e/behavior.mjs",
+        "editor/test/e2e/README.md",
+        "impl-plans/active/vim-mode-40-e2e-verify.md",
+        "target",
+        "tree-sitter-vact/tree-sitter-vact.wasm",
+        "editor/node_modules",
+        "editor/dist",
+        "tmp/ui-style",
+        "tmp/vim-mode/e2e",
+        "tmp/vim-mode/VIM-40"
+      ],
+      "sharedPaths": [
+        "editor/test/style/ui-style.mjs"
+      ],
+      "sharedPathNotes": [
+        { "path": "editor/test/style/ui-style.mjs", "intendedEdit": "Mechanical fixes only if the VIM-30 vim pass breaks in a real browser run (selectors, waits); never weaken an existing assertion." }
+      ],
+      "artifactRoots": ["target", "tree-sitter-vact/tree-sitter-vact.wasm", "editor/node_modules", "editor/dist", "tmp/ui-style", "tmp/vim-mode/e2e", "tmp/vim-mode/VIM-40"],
+      "acceptanceCriteria": [
+        "vim-behavior.mjs implements the six checks vim-toggle, vim-dcyp, vim-visual, vim-dot, vim-ime-normal and vim-shortcut in their own context, and behavior.mjs merges them",
+        "vim-ime-normal passes in Chromium (CDP Input.imeSetComposition then Input.insertText leaves 'stable' and its revision unchanged) and WebKit after the VIM-15 repair",
+        "Gates 1-3, 5 and 7 pass with records in the Progress Log",
+        "Gates 4 (test:style) and 6 (Playwright e2e) pass, or carry a recorded verificationGap for the serial Opus verification step with the exact sandbox error",
+        "No tracked evidence file under design-docs/specs/evidence changed",
+        "editor/dist is rebuilt (gate 3) after the last source change and immediately before the e2e gate (gate 6), so the e2e never exercises a stale dist"
+      ],
+      "verification": [
+        "cd editor && npm run check",
+        "cd editor && ./node_modules/.bin/vitest run",
+        "cd editor && VACTR_WASM=../target/wasm32-unknown-unknown/debug/vactr.wasm VACTR_REQUIRE_SESSION_ABI=1 npm run build",
+        "cd editor && npm run test:style",
+        "cd editor && node --check test/e2e/vim-behavior.mjs",
+        "cd editor && npm run e2e -- --browser all --profile behavior --run-id vim-001 --out ../tmp/vim-mode/e2e/vim-001",
+        "git diff --stat -- design-docs/specs/evidence"
+      ],
+      "measureLockedVerification": [
+        "cd editor && ./node_modules/.bin/vitest run",
+        "cd editor && npm run test:style",
+        "cd editor && npm run e2e -- --browser all --profile behavior --run-id vim-001 --out ../tmp/vim-mode/e2e/vim-001"
+      ]
+    },
+    {
+      "planId": "VIM-41",
+      "planPath": "impl-plans/active/vim-mode-41-docs.md",
+      "dependsOn": ["VIM-30"],
+      "writePaths": [
+        "README.md",
+        "impl-plans/active/vim-mode-41-docs.md",
+        "target",
+        "tree-sitter-vact/tree-sitter-vact.wasm",
+        "editor/node_modules",
+        "tmp/vim-mode/VIM-41"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["target", "tree-sitter-vact/tree-sitter-vact.wasm", "editor/node_modules", "tmp/vim-mode/VIM-41"],
+      "acceptanceCriteria": [
+        "README.md has the new bullet and the ### Vim mode subsection with all ten parts",
+        "Every key and command named exists in design section 2.1 or 4.13",
+        "No other file is changed (README.jd.md untouched)"
+      ],
+      "verification": [
+        "grep -n '### Vim mode' README.md",
+        "git diff --stat -- README.md README.jd.md"
+      ]
+    }
+  ],
+  "serialFinalization": [
+    "After VIM-40 and VIM-41: update impl-plans/README.md status lines and design-docs/specs/design-vim-mode.md Status, archive the vim-mode plans to impl-plans/completed/ (serial, single owner), commit on wf/vim-mode without tool attribution."
+  ]
+}

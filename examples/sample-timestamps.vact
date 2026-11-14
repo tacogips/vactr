@@ -1,0 +1,29 @@
+# Millisecond timestamps: 123 means 123ms; 123.456 means 123ms + 456us.
+# Stop is exclusive. All edits operate directly on one downloaded source WAV.
+# Play: target/debug/vactr run examples/sample-timestamps.vact --host native --cycles 16
+use-bpm 165
+
+let amen sample ./samples/amen-recreation/source.wav
+let source s amen
+
+master:
+	gain 4 > limiter ceiling: -2 release: 0.08
+
+# First four bars: a straight chop of the first source bar.
+source > start-ms 0 > stop-ms 1454.545 > chop 16
+	> attack 0.001 > release 0.003 > gain {slow [0.45 0 0 0] 16} > d1
+
+# Next four: splice reorders regions of the second bar and fits nested retriggers.
+source > start-ms 1454.545 > stop-ms 2909.091
+	> splice 16 [0 1 4 [4 4] 8 9 12 [12 12 12] 0 3 4 7 8 11 12 15]
+	> attack 0.001 > release 0.003 > gain {slow [0 0.45 0 0] 16} > d2
+
+# Third statement: reversed audio from selected slices, not just reversed event order.
+source > start-ms 2909.091 > stop-ms 4363.636
+	> slice 16 [0 4 8 12] > speed -1
+	> attack 0.001 > release 0.003 > gain {slow [0 0 0.4 0] 16} > d3
+
+# Final statement: direct time positions. These decimal literals remain exact.
+source > start-ms [4363.636 4727.273 5090.909 5454.545]
+	> stop-ms [4727.273 5090.909 5454.545 5818.163]
+	> attack 0.001 > release 0.003 > gain {slow [0 0 0 0.45] 16} > d4

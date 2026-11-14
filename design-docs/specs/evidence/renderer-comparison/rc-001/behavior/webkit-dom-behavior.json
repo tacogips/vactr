@@ -1,0 +1,69 @@
+{
+  "name": "webkit",
+  "checks": [
+    {
+      "id": "dom-visible-text",
+      "pass": true,
+      "detail": "visible rows=3; keyword=rgb(163, 190, 140); bridge opacity=0"
+    },
+    {
+      "id": "dom-caret-alignment",
+      "pass": true,
+      "detail": "caret deltas=0.609375,0.625,0.5px"
+    },
+    {
+      "id": "editing-undo-redo-navigation",
+      "pass": true,
+      "detail": "undo=9; redo=10; home=0; word=3; end=62"
+    },
+    {
+      "id": "clipboard-synthetic-event",
+      "status": "limitation",
+      "pass": null,
+      "detail": "WebKit synthetic ClipboardEvent cannot verify system clipboard contents; excluded from pass counts."
+    },
+    {
+      "id": "japanese-ime-synthetic",
+      "status": "limitation",
+      "pass": null,
+      "detail": "WebKit synthetic composition events cannot establish real IME commit behavior; excluded from pass counts."
+    },
+    {
+      "id": "touch-selection",
+      "pass": true,
+      "detail": "{\"selection\":{\"anchor\":0,\"head\":3},\"handles\":2,\"domHandles\":2}"
+    },
+    {
+      "id": "dpr-and-resize",
+      "pass": true,
+      "detail": "{\"selection\":{\"anchor\":0,\"head\":3},\"builds\":11,\"actual\":1,\"effective\":1}"
+    },
+    {
+      "id": "visual-viewport-inset",
+      "pass": true,
+      "detail": "bridge bottom=67; inset height=360"
+    },
+    {
+      "id": "background-no-replay",
+      "pass": true,
+      "detail": "frames hidden=84, resumed=93"
+    },
+    {
+      "id": "dom-bounded-nodes",
+      "pass": true,
+      "detail": "{\"middle\":{\"liveLines\":59,\"rows\":43,\"margin\":22,\"from\":19941,\"to\":20000},\"end\":{\"liveLines\":59,\"rows\":43,\"margin\":22,\"from\":19941,\"to\":20000}}"
+    },
+    {
+      "id": "dispose-ledger",
+      "pass": true,
+      "detail": "usedBytes=0; DOM surface removed"
+    }
+  ],
+  "passed": 9,
+  "total": 9,
+  "limitations": [
+    "WebKit synthetic ClipboardEvent cannot verify system clipboard contents; excluded from pass counts.",
+    "WebKit synthetic composition events cannot establish real IME commit behavior; excluded from pass counts.",
+    "WebKit touch selection uses synthetic pointer events."
+  ]
+}

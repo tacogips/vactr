@@ -1,0 +1,23 @@
+bus :room:
+	gain 0.75
+fn make:
+	part [drums: {s :analog > chord [:c :maj] > gain 0.2} hats: {s :analog > note {choose 60 61 62 63 64 65 66 67 68 69 70 71 72 73 74 75} > gain 0.2}] duration: 4
+fn make-slice:
+	part [hats: {s :analog > slow 64}] duration: 1
+fn remove-one p:
+	let events {part-events p :drums 0 4}
+	let handle {{first events} :handle}
+	let changed {delete-event p handle}
+	overwrite-region changed :drums 1 2 {s :analog > note {choose 60 61 62 63 64 65 66 67 68 69 70 71 72 73 74 75} > gain 0.2}
+fn edit p:
+	remove-one p
+fn indexed p:
+	slice {beat -> p} 2 [0]
+let original {make & []}
+let edited {edit original}
+let filtered {transform-instrument edited :drums :analog {p -> lpf p 900}}
+let effected {instrument-fx filtered :drums :analog :room}
+let slice-source {make-slice & []}
+let sliced {transform-instrument slice-source :hats :analog indexed}
+let arrangement sequence [sliced {part-repeat effected 2 seed-mode: :same} {part-repeat effected 2 seed-mode: :vary}]
+song arrangement bpm: 120 cycle-beats: 4 seed: 42 tail-seconds: 2 > play-song

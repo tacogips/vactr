@@ -1,0 +1,340 @@
+{
+  "taskId": "cmp",
+  "workflowMode": "issue-resolution",
+  "implementationBranch": "wf/syntax-fmt",
+  "baseBranch": "wf/syntax-fmt",
+  "remote": "origin",
+  "originalHead": "b4ef89d0b99e6c4c49973ecd2ffd84b118661bc2",
+  "designDocPaths": [
+    "design-docs/specs/design-completion.md",
+    "design-docs/specs/design-formatter-and-syntax.md",
+    "design-docs/specs/architecture.md",
+    "design-docs/specs/design-implementation.md",
+    "design-docs/specs/command.md",
+    "design-docs/user-qa/pending-completion-questions.md",
+    "design-docs/user-qa/README.md"
+  ],
+  "planIndexPath": "impl-plans/README.md",
+  "evidenceRoot": "tmp/cmp",
+  "evidenceLayout": "tmp/cmp/<planId>/attempt-<n>/ holds one full log per verification command, each ending with an exit=<status> line. Each plan's Progress Log records every command, its exit status and its log path. tmp/ is gitignored and never listed in writePaths. A missing or truncated log is not a pass. A step blocked by the sandbox (network, ~/.cache/tree-sitter, localhost, full nextest) is recorded as BLOCKED with the command, exit code and stderr; CMP-40 reruns it.",
+  "executionModel": {
+    "waves": [
+      ["CMP-10", "CMP-15", "FST-50", "EDS-10", "EDS-11", "EDS-12"],
+      ["CMP-20", "CMP-21", "CMP-30", "CMP-31"],
+      ["CMP-32"],
+      ["CMP-40"]
+    ],
+    "sameBranchFanout": true,
+    "worktrees": false,
+    "workersMayChangeGitState": false,
+    "commitOwner": "The orchestrator commits the accepted design and all plans before fanout, and commits implementation after review, with AGENTS.md 1-6 section commit messages. Workers never commit, stash, checkout, reset, branch, push or merge. Only wf/syntax-fmt is pushed; never main.",
+    "retryPolicy": "Concurrent plans share one cargo target dir and one editor/node_modules. If cargo reports a build-directory lock, wait about 60 s and retry, up to 10 times, then record a blocker. A compile or typecheck error located in another concurrent plan's writePaths is transient: never edit that file; wait about 120 s and retry up to 10 times, then record it as BLOCKED for CMP-40. Examples: a wasm32 build during wave 1 hitting CMP-10's in-progress src/complete, or `tsc --noEmit` hitting a sibling's half-written .ts file. Never run npm install; no plan changes package.json or package-lock.json.",
+    "editProtocol": "Before each edit, re-read the file and record its sha256 and a one-line intent snapshot in the plan's Progress Log. After the edit, record the post-edit sha256. If the file drifted from the last recorded hash, stop and report. Never edit outside writePaths. Each worker edits only its own plan's Progress Log. Formatting is limited to rustfmt on the plan's own .rs files (never `cargo fmt` without --check).",
+    "serialReconciliation": "CMP-40 owns README.md, impl-plans/README.md, plan archiving, the design Status lines, reruns of BLOCKED steps and the full gate. A defect found outside a worker's writePaths is recorded in that worker's Progress Log and repaired serially by CMP-40 or by the orchestrator's review step, with file, cause, fix and pre/post sha256."
+  },
+  "reviewContext": {
+    "issueReference": "workflowInput issue 'Add a canvas-ready context-aware completion engine (LSP + wasm + UI-agnostic editor service), expose tree-sitter spans UI-agnostically, and formatter follow-ups' (user request 2026-09-30; no GitHub number); workflow opus-luna-design-and-implement-review-loop-session-226; design accepted in comm-002893; plans accepted in comm-002895 (step5-impl-plan-review)",
+    "userProblem": "The user asked for completion suggestions that appear while typing. Completion exists only in the LSP, filtered with starts_with, with no scope, context or ranking, and the web editor has none. The web editor is also moving to a GPU canvas, so completion and tree-sitter spans must not depend on EditorView. Two formatter follow-ups are in scope: space-indent repair and the VACTR_WASM test loader.",
+    "requiredOutcomes": [
+      "src/complete: a wasm32-clean, never-panicking engine with seven contexts, scope-aware locals, ranking and a cap of 100, with nextest coverage and a recorded release budget under 5 ms.",
+      "LSP completion on the engine with isIncomplete, UTF-16 textEdits, a superset test and the one justified test change.",
+      "Pinned wasm exports complete_source, complete_out_ptr and complete_out_len, and a node test against the real artifact.",
+      "Editor: completion-types.ts, the completion.ts service, the completion-popup.ts DOM popup and the completion-view.ts EditorView adapter, with minimal wiring and vitest coverage (UTF-16 and Japanese text, keys, mouse, IME, fallback).",
+      "syntax-core.ts and format-core.ts without CodeMirror, plus the shared ToolWasm.",
+      "The formatter space-indent repair per design-formatter-and-syntax 3.9, with Rust and CLI tests.",
+      "editor/test/wasm/format.test.ts honors VACTR_WASM.",
+      "The full gate in CMP-40 passes."
+    ],
+    "nonGoals": [
+      "signatureHelp, snippets, session-held completion names, open-import unqualified names.",
+      "@codemirror/autocomplete or any new npm or crate dependency.",
+      "Edits to editor/src/app/apis.ts or editor/src/code/language.ts.",
+      "Reader changes, and reformatting of committed .vact files.",
+      "Incremental tree.edit highlighting."
+    ],
+    "designDecisionsAndRationale": [
+      "The engine uses the reader's layout skeleton, because an erroring statement becomes a childless Error node (src/reader/line.rs:295).",
+      "Builtin snapshot for wasm (C3); the LSP adds manifest, package and checked-type details.",
+      "Keywords only in the :keyword context (C1); signatureHelp deferred (C2).",
+      "The repair gate allows indent-space plus empty-block, because space indentation causes empty-block (C4); the unit is 2..8 (C5).",
+      "Popup keys are intercepted only while open, except Ctrl-Space (C6).",
+      "No manual-mode classification: the ABI carries no mode (design 3.3, last bullet)."
+    ],
+    "constraints": [
+      "Work only on wf/syntax-fmt in this worktree; push only wf/syntax-fmt, never main.",
+      "Build on the committed session-222 formatter and tree-sitter work; touch it only for shared completion hooks.",
+      "AGENTS.md: English only, no emojis, Rust files under 1000 lines, CARGO_TERM_QUIET=true for cargo.",
+      "The completion core is wasm32-clean, never panics on partial input, and stays inside a documented per-keystroke budget (under 5 ms for a 2000-line document, native release).",
+      "No @codemirror/autocomplete, no EditorView dependency outside completion-view.ts, no new crate or npm dependencies.",
+      "Do not edit editor/src/app/apis.ts or editor/src/code/language.ts; mount.ts, main.ts and deps.ts get minimal wiring lines only.",
+      "Every plan owns at least one committed nextest, vitest or node test with a positive test count.",
+      "During fanout, gates are scoped to each plan's own files; workspace-wide gates run in CMP-40.",
+      "Manifest paths are concrete tracked paths only; never target/, editor/node_modules, editor/dist, tree-sitter-vact/node_modules or tmp/."
+    ],
+    "intentionalTradeoffs": [
+      "The wasm path uses a builtin context snapshot (prelude natives, templates, spec-default manifest), so session-held names and project manifests appear only in the LSP (C3).",
+      "The LSP reply changes from CompletionResponse::Array to List with isIncomplete; one existing LSP test changes per design 4.2.",
+      "Keyword candidates appear only in the :keyword context, not mixed into heads (C1); signatureHelp is deferred (C2).",
+      "The repair accepts only indent-space plus empty-block errors and units 2..8; anything else is refused unchanged (C4, C5).",
+      "CompletionEngine.complete resolves to RawCompletion | null (null for status 2 and 3), a narrowing of design 6.1 that matches the service's null handling.",
+      "Tree-sitter highlighting stays full-reparse; incremental tree.edit is deferred."
+    ],
+    "supportedEdgeCases": [
+      "Cursor inside strings or comments yields no candidates.",
+      "Partial, unterminated or invalid input at every char-boundary prefix of committed .vact files never panics.",
+      "Block lets are visible only after their statement and inside their block; inner scopes shadow outer ones.",
+      "PairKey at a native head's positional arity limit (k >= 1); an inst head with no earlier pair is Argument.",
+      "UTF-16 replace ranges for Japanese text and surrogate pairs in both LSP textEdits and the editor service.",
+      "IME composition suppresses the popup; Enter accepts only while the popup is open; Ctrl-Space triggers manually.",
+      "Missing or failing wasm disables completion after one failure and the editor keeps working.",
+      "2- and 4-space indented files are repaired; ambiguous widths, mixed tab/space lines and other reader errors are refused unchanged.",
+      "VACTR_WASM overrides the artifact path in editor/test/wasm/format.test.ts."
+    ],
+    "outOfScopeEdgeCases": [
+      "Remote or other non-typing document changes while the popup is open are handled only by the text-equality check on the next result (design 6.3).",
+      "Open-import unqualified names and session-held names in the web editor.",
+      "Snippet or placeholder insertion.",
+      "Canvas surface adapter: plan J1 replaces the single attachCompletion(editorView, ...) line in mount.ts at cutover.",
+      "User-QA C1-C6 defaults remain pending confirmation in design-docs/user-qa/pending-completion-questions.md."
+    ],
+    "sourcePaths": [
+      "src/lsp/analysis.rs",
+      "src/lsp/server.rs",
+      "src/reader/layout.rs",
+      "src/reader/lexer.rs",
+      "src/reader/line.rs",
+      "src/types/natives.rs",
+      "src/types/manifest.rs",
+      "src/dsp/ugen/catalog.rs",
+      "src/fmt/mod.rs",
+      "src/host/wasm/fmt_abi.rs",
+      "src/host/wasm/mod.rs",
+      "editor/src/code/syntax.ts",
+      "editor/src/code/format.ts",
+      "editor/src/code/mount.ts",
+      "editor/src/app/main.ts",
+      "editor/src/app/deps.ts",
+      "editor/test/support/wasm.ts",
+      "editor/test/wasm/format.test.ts"
+    ]
+  },
+  "plans": [
+    {
+      "planId": "CMP-10",
+      "planPath": "impl-plans/active/cmp-10-complete-core.md",
+      "acceptanceCriteria": ["The pinned src/complete public contract exists exactly as written in the plan.", "All seven contexts, scope rules, sources and ranking are covered by the listed context, scope, rank and robust tests, and they pass.", "No panic over the committed .vact corpus prefixes and the mutants.", "The wasm32 build passes and the release budget median is recorded.", "src/lib.rs has only the one-line module addition and its doc line.", "Verification steps 1-7 are logged with exit=0 and the Progress Log is updated."],
+      "dependsOn": [],
+      "writePaths": ["src/complete/mod.rs", "src/complete/context.rs", "src/complete/scope.rs", "src/complete/sources.rs", "src/complete/rank.rs", "src/complete/tests/mod.rs", "src/complete/tests/context.rs", "src/complete/tests/scope.rs", "src/complete/tests/rank.rs", "src/complete/tests/robust.rs", "src/lib.rs", "impl-plans/active/cmp-10-complete-core.md"],
+      "sharedPaths": ["src/reader/layout.rs", "src/reader/lexer.rs", "src/reader/import.rs", "src/reader/mod.rs", "src/types/natives.rs", "src/types/manifest.rs", "src/dsp/meta.rs", "src/dsp/ugen/catalog.rs", "src/fmt/mod.rs", "src/fmt/tests/mutation.rs", "src/fmt/tests/corpus.rs"],
+      "sharedPathNotes": [
+        {"path": "src/lib.rs", "intendedEdit": "Add `pub mod complete;` after `pub mod compile;` and one module-doc line; nothing else."}
+      ],
+      "verification": [
+        "CARGO_TERM_QUIET=true cargo build",
+        "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm",
+        "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run complete::",
+        "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run --release --run-ignored only -E 'test(budget)'",
+        "CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings",
+        "rustfmt --edition 2021 --check src/complete/*.rs src/complete/tests/*.rs src/lib.rs",
+        "wc -l src/complete/*.rs src/complete/tests/*.rs"
+      ]
+    },
+    {
+      "planId": "CMP-15",
+      "planPath": "impl-plans/active/cmp-15-completion-types.md",
+      "acceptanceCriteria": ["Every pinned export in completion-types.ts exists with exactly the pinned names and shapes.", "The completion-types tests pass and tsc --noEmit passes.", "No @codemirror string appears in completion-types.ts.", "The Progress Log records the commands, exit codes and log paths."],
+      "dependsOn": [],
+      "writePaths": ["editor/src/code/completion-types.ts", "editor/test/code/completion-types.test.ts", "impl-plans/active/cmp-15-completion-types.md"],
+      "sharedPaths": ["editor/src/code/format.ts", "editor/tsconfig.json", "editor/test/support/wasm.ts"],
+      "verification": [
+        "cd editor && npx tsc --noEmit",
+        "cd editor && npx vitest run test/code/completion-types.test.ts"
+      ]
+    },
+    {
+      "planId": "FST-50",
+      "planPath": "impl-plans/active/fst-50-fmt-space-repair.md",
+      "acceptanceCriteria": ["The repair runs only under the design 3.9 preconditions, the zero-error re-read gate is enforced, and refusal returns the original text and diagnostics.", "2- and 4-space fixtures convert, are idempotent and equal the tab version; ambiguous, mixed and other-error cases are refused unchanged.", "The new CLI tests pass and the existing fmt and CLI tests pass unchanged.", "Verification steps 1-7 are logged with exit=0 and the Progress Log is updated."],
+      "dependsOn": [],
+      "writePaths": ["src/fmt/mod.rs", "src/fmt/repair.rs", "src/fmt/tests/mod.rs", "src/fmt/tests/repair.rs", "src/fmt/tests/mutation.rs", "src/fmt/tests/fixtures/space2.in", "src/fmt/tests/fixtures/space2.out", "src/fmt/tests/fixtures/space4.in", "src/fmt/tests/fixtures/space4.out", "src/fmt/tests/fixtures/space-ambiguous.in", "src/fmt/tests/fixtures/space-ambiguous.out", "src/fmt/tests/fixtures/space-mixed-lines.in", "src/fmt/tests/fixtures/space-mixed-lines.out", "src/fmt/tests/fixtures/space-other-error.in", "src/fmt/tests/fixtures/space-other-error.out", "src/cli/tests/fmt.rs", "impl-plans/active/fst-50-fmt-space-repair.md"],
+      "sharedPaths": ["src/fmt/lines.rs", "src/fmt/levels.rs", "src/reader/layout.rs", "src/types/diag.rs", "src/cli/fmt.rs", "src/cli/args.rs", "src/fmt/tests/fixtures/blocks.in", "src/fmt/tests/fixtures/continuation.in", "src/fmt/tests/fixtures/directives.in", "src/fmt/tests/fixtures/mixed-indent.in"],
+      "sharedPathNotes": [
+        {"path": "src/fmt/mod.rs", "intendedEdit": "Add `mod repair;`, extract the clean-path body into a private helper, and on refusal try repair::space_indent plus a zero-error re-read. The public API is unchanged."},
+        {"path": "src/fmt/tests/mutation.rs", "intendedEdit": "The reader-error branch accepts Refused-unchanged or a repaired Changed output with a clean re-read and tab-only code indents."},
+        {"path": "src/cli/tests/fmt.rs", "intendedEdit": "Append the 4-space rewrite, --check, and ambiguous refusal (exit 3) tests only."}
+      ],
+      "verification": [
+        "CARGO_TERM_QUIET=true cargo build",
+        "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run fmt::",
+        "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run cli::tests::fmt",
+        "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm",
+        "CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings",
+        "rustfmt --edition 2021 --check src/fmt/mod.rs src/fmt/repair.rs src/fmt/tests/mod.rs src/fmt/tests/repair.rs src/fmt/tests/mutation.rs src/cli/tests/fmt.rs",
+        "mise run fmt-vact-check"
+      ]
+    },
+    {
+      "planId": "EDS-10",
+      "planPath": "impl-plans/active/eds-10-syntax-span-core.md",
+      "acceptanceCriteria": ["syntax-core.ts exports the moved symbols plus StyleSpan and styleSpans and has no @codemirror import.", "syntax.ts is a thin adapter that re-exports the moved symbols, and no other file changed.", "The new syntax-core test passes with the throwing mocks, and the existing syntax tests pass.", "Logs are recorded and the Progress Log is updated."],
+      "dependsOn": [],
+      "writePaths": ["editor/src/code/syntax-core.ts", "editor/src/code/syntax.ts", "editor/test/code/syntax-core.test.ts", "impl-plans/active/eds-10-syntax-span-core.md"],
+      "sharedPaths": ["editor/test/code/syntax.test.ts", "editor/test/code/syntax-fallback.test.ts", "editor/src/code/language.ts", "tree-sitter-vact/queries/highlights.scm"],
+      "sharedPathNotes": [
+        {"path": "editor/src/code/syntax.ts", "intendedEdit": "Move the CodeMirror-free symbols to syntax-core.ts and re-export them; decorations() maps styleSpans to Decoration.mark with identical output."}
+      ],
+      "verification": [
+        "cd editor && npx tsc --noEmit",
+        "cd editor && npx vitest run test/code/syntax-core.test.ts test/code/syntax.test.ts test/code/syntax-fallback.test.ts"
+      ]
+    },
+    {
+      "planId": "EDS-11",
+      "planPath": "impl-plans/active/eds-11-wasm-format-loader.md",
+      "acceptanceCriteria": ["No hardcoded artifact path remains in editor/test/wasm/format.test.ts, and every artifact read goes through loadVactrWasm().", "Steps 1-5 are logged and all three tests pass in both the default and VACTR_WASM runs.", "The Progress Log is updated."],
+      "dependsOn": [],
+      "writePaths": ["editor/test/wasm/format.test.ts", "impl-plans/active/eds-11-wasm-format-loader.md"],
+      "sharedPaths": ["editor/test/support/wasm.ts"],
+      "sharedPathNotes": [
+        {"path": "editor/test/wasm/format.test.ts", "intendedEdit": "readWasm() reads bytes from (await loadVactrWasm()).path; remove the hardcoded target path; keep all three cases."}
+      ],
+      "verification": [
+        "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm",
+        "cd editor && npx vitest run test/wasm/format.test.ts",
+        "cd editor && VACTR_WASM=../target/wasm32-unknown-unknown/debug/vactr.wasm npx vitest run test/wasm/format.test.ts",
+        "grep -c 'target/wasm32-unknown-unknown' editor/test/wasm/format.test.ts",
+        "cd editor && npx tsc --noEmit"
+      ]
+    },
+    {
+      "planId": "EDS-12",
+      "planPath": "impl-plans/active/eds-12-format-core-tool-wasm.md",
+      "acceptanceCriteria": ["ToolWasm, WasmFormatter(string | ToolWasm) and minimalChange match the pinned contract.", "format.ts keeps its public API through re-exports, and main.ts compiles unchanged.", "The new and appended tests pass, and the existing format tests pass unchanged.", "tool-wasm.ts and format-core.ts contain no @codemirror import.", "Logs are recorded and the Progress Log is updated."],
+      "dependsOn": [],
+      "writePaths": ["editor/src/code/tool-wasm.ts", "editor/src/code/format-core.ts", "editor/src/code/format.ts", "editor/test/code/format.test.ts", "editor/test/code/tool-wasm.test.ts", "impl-plans/active/eds-12-format-core-tool-wasm.md"],
+      "sharedPaths": ["editor/src/app/main.ts", "editor/test/wasm/format.test.ts"],
+      "sharedPathNotes": [
+        {"path": "editor/src/code/format.ts", "intendedEdit": "Keep FORMAT_KEY, formatDocument (now via minimalChange) and formatKeymap; re-export WasmFormatter, minimalChange, Formatter and FormatResult from format-core."},
+        {"path": "editor/test/code/format.test.ts", "intendedEdit": "Append minimalChange and no-codemirror source checks; existing cases unchanged."}
+      ],
+      "verification": [
+        "cd editor && npx tsc --noEmit",
+        "cd editor && npx vitest run test/code/format.test.ts test/code/tool-wasm.test.ts",
+        "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm && cd editor && npx vitest run test/wasm/format.test.ts"
+      ]
+    },
+    {
+      "planId": "CMP-20",
+      "planPath": "impl-plans/active/cmp-20-complete-lsp.md",
+      "acceptanceCriteria": ["The LSP completion path calls complete::complete and returns CompletionResponse::List with is_incomplete.", "Items carry UTF-16 text_edits, a rank sort_text and the mapped kinds.", "The changed test matches design 4.2, and the new local, keyword, control, UTF-16, incomplete, string/comment and superset tests pass.", "Steps 1-6 are logged and the Progress Log is updated."],
+      "dependsOn": ["CMP-10"],
+      "writePaths": ["src/lsp/analysis.rs", "src/lsp/server.rs", "src/lsp/tests/mod.rs", "src/lsp/tests/analysis.rs", "src/lsp/tests/complete.rs", "impl-plans/active/cmp-20-complete-lsp.md"],
+      "sharedPaths": ["src/complete/mod.rs", "src/lsp/convert.rs", "src/session/eval.rs"],
+      "sharedPathNotes": [
+        {"path": "src/lsp/analysis.rs", "intendedEdit": "Add complete_list on the engine, keep complete as a wrapper, and change the AnalysisReq::Complete reply to CompletionList; format_edits untouched."},
+        {"path": "src/lsp/server.rs", "intendedEdit": "The completion handler returns CompletionResponse::List; nothing else."},
+        {"path": "src/lsp/tests/analysis.rs", "intendedEdit": "Change only completion_offers_prelude_names_keywords_and_document_names per design 4.2."}
+      ],
+      "verification": [
+        "CARGO_TERM_QUIET=true cargo build --features lsp",
+        "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run --features lsp lsp::",
+        "CARGO_TERM_QUIET=true cargo clippy --all-targets --features lsp -- -D warnings",
+        "CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings",
+        "rustfmt --edition 2021 --check src/lsp/analysis.rs src/lsp/server.rs src/lsp/tests/mod.rs src/lsp/tests/analysis.rs src/lsp/tests/complete.rs",
+        "wc -l src/lsp/analysis.rs src/lsp/tests/analysis.rs src/lsp/tests/complete.rs"
+      ]
+    },
+    {
+      "planId": "CMP-21",
+      "planPath": "impl-plans/active/cmp-21-complete-wasm.md",
+      "acceptanceCriteria": ["complete_source, complete_out_ptr and complete_out_len exist with the pinned signatures and appear in the export listing.", "The committed test passes against the real wasm artifact, the outbox stays empty, and statuses 2 and 3 are covered.", "Steps 1-6 are logged and the Progress Log is updated."],
+      "dependsOn": ["CMP-10"],
+      "writePaths": ["src/host/wasm/complete_abi.rs", "src/host/wasm/mod.rs", "editor/test/wasm/complete.test.ts", "impl-plans/active/cmp-21-complete-wasm.md"],
+      "sharedPaths": ["src/host/wasm/fmt_abi.rs", "src/host/wasm/abi.rs", "src/complete/mod.rs", "editor/test/support/wasm.ts", "editor/test/wasm/format.test.ts"],
+      "sharedPathNotes": [
+        {"path": "src/host/wasm/mod.rs", "intendedEdit": "Add `pub mod complete_abi;` before `pub mod fmt_abi;` and one doc sentence."}
+      ],
+      "verification": [
+        "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm",
+        "CARGO_TERM_QUIET=true cargo clippy --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm -- -D warnings",
+        "node --input-type=module -e \"import fs from 'node:fs'; const m = await WebAssembly.compile(fs.readFileSync('target/wasm32-unknown-unknown/debug/vactr.wasm')); console.log(WebAssembly.Module.exports(m).map(e => e.name).filter(n => n.startsWith('complete_') || n.startsWith('fmt_') || n === 'session_init').sort().join(' '))\"",
+        "cd editor && npx vitest run test/wasm/complete.test.ts",
+        "CARGO_TERM_QUIET=true cargo build",
+        "rustfmt --edition 2021 --check src/host/wasm/complete_abi.rs src/host/wasm/mod.rs"
+      ]
+    },
+    {
+      "planId": "CMP-30",
+      "planPath": "impl-plans/active/cmp-30-completion-service.md",
+      "acceptanceCriteria": ["The pinned completion.ts exports exist and the service never throws.", "The UTF-16 and UTF-8 helpers are correct for Japanese text and surrogate pairs.", "The fallback disables the engine after one failure.", "completion.ts has no @codemirror import.", "Logs are recorded and the Progress Log is updated."],
+      "dependsOn": ["CMP-15", "EDS-12"],
+      "writePaths": ["editor/src/code/completion.ts", "editor/test/code/completion.test.ts", "impl-plans/active/cmp-30-completion-service.md"],
+      "sharedPaths": ["editor/src/code/completion-types.ts", "editor/src/code/tool-wasm.ts", "editor/src/code/format-core.ts"],
+      "verification": [
+        "cd editor && npx tsc --noEmit",
+        "cd editor && npx vitest run test/code/completion.test.ts"
+      ]
+    },
+    {
+      "planId": "CMP-31",
+      "planPath": "impl-plans/active/cmp-31-completion-popup.md",
+      "acceptanceCriteria": ["The pinned exports and DOM contract are implemented and the behavior table is covered by popup tests against a fake CompletionSurface.", "Keys are never consumed while the popup is closed (except Ctrl-Space), and IME and staleness rules hold.", "completion-popup.ts has no @codemirror import.", "Logs are recorded and the Progress Log is updated."],
+      "dependsOn": ["CMP-15"],
+      "writePaths": ["editor/src/code/completion-popup.ts", "editor/test/code/completion-popup.test.ts", "impl-plans/active/cmp-31-completion-popup.md"],
+      "sharedPaths": ["editor/src/code/completion-types.ts", "editor/src/code/transport.ts", "editor/src/code/samples.ts"],
+      "verification": [
+        "cd editor && npx tsc --noEmit",
+        "cd editor && npx vitest run test/code/completion-popup.test.ts"
+      ]
+    },
+    {
+      "planId": "CMP-32",
+      "planPath": "impl-plans/active/cmp-32-completion-view-wiring.md",
+      "acceptanceCriteria": ["attachCompletion implements CompletionSurface in completion-view.ts, the only completion file that imports @codemirror/view.", "Enter accepts while the popup is open and inserts a newline while it is closed.", "Eval and format keys are untouched, and the mount.ts, main.ts and deps.ts wiring is minimal.", "The real-wasm completion-engine test passes.", "Steps 1-5 are logged and the Progress Log is updated."],
+      "dependsOn": ["CMP-21", "CMP-30", "CMP-31", "EDS-12"],
+      "writePaths": ["editor/src/code/completion-view.ts", "editor/src/code/mount.ts", "editor/src/app/main.ts", "editor/src/app/deps.ts", "editor/test/code/completion-view.test.ts", "editor/test/wasm/completion-engine.test.ts", "impl-plans/active/cmp-32-completion-view-wiring.md"],
+      "sharedPaths": ["editor/src/code/completion-types.ts", "editor/src/code/completion.ts", "editor/src/code/completion-popup.ts", "editor/src/code/tool-wasm.ts", "editor/src/code/format-core.ts", "editor/src/code/format.ts", "editor/test/code/format.test.ts", "editor/test/support/wasm.ts"],
+      "sharedPathNotes": [
+        {"path": "editor/src/code/mount.ts", "intendedEdit": "Import attachCompletion; attach after diagnostics.attach when deps.completion is set; dispose before editorView.destroy. Three lines."},
+        {"path": "editor/src/app/main.ts", "intendedEdit": "One shared ToolWasm; WasmFormatter(tool); deps.completion = new WasmCompletionEngine(tool); imports."},
+        {"path": "editor/src/app/deps.ts", "intendedEdit": "Type import of CompletionEngine and the optional `completion?: CompletionEngine` field."}
+      ],
+      "verification": [
+        "cd editor && npx tsc --noEmit",
+        "cd editor && npx vitest run test/code/completion-view.test.ts test/wasm/completion-engine.test.ts",
+        "cd editor && npx vitest run test/code",
+        "cd editor && npm run build",
+        "git diff --numstat -- editor/src/code/mount.ts editor/src/app/main.ts editor/src/app/deps.ts"
+      ]
+    },
+    {
+      "planId": "CMP-40",
+      "planPath": "impl-plans/active/cmp-40-closeout.md",
+      "acceptanceCriteria": ["Gate steps 1-12 exit 0, each with a complete log, and the test counts and budget median are recorded.", "No BLOCKED step remains unresolved, or each remaining one is reported explicitly with its evidence.", "The file-size, path-scope, no-autocomplete and untouched apis.ts/language.ts checks pass.", "README, plan index and design status lines are updated and the plans are archived.", "The Progress Log is updated."],
+      "dependsOn": ["CMP-10", "CMP-15", "FST-50", "EDS-10", "EDS-11", "EDS-12", "CMP-20", "CMP-21", "CMP-30", "CMP-31", "CMP-32"],
+      "writePaths": ["README.md", "impl-plans/README.md", "design-docs/specs/design-completion.md", "design-docs/specs/design-formatter-and-syntax.md", "impl-plans/active/cmp-dispatch.json", "impl-plans/active", "impl-plans/completed"],
+      "sharedPaths": ["src", "editor/src", "editor/test"],
+      "sharedPathNotes": [
+        {"path": "design-docs/specs/design-completion.md", "intendedEdit": "Status line only."},
+        {"path": "design-docs/specs/design-formatter-and-syntax.md", "intendedEdit": "The session-226 status sentence only."},
+        {"path": "impl-plans/active", "intendedEdit": "Plan status updates and moving the eleven plan files plus cmp-40 to impl-plans/completed."},
+        {"path": "src", "intendedEdit": "Read-only, except for serial gate repairs recorded with file, cause, fix and pre/post sha256."}
+      ],
+      "verification": [
+        "CARGO_TERM_QUIET=true cargo build",
+        "CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings",
+        "CARGO_TERM_QUIET=true cargo clippy --all-targets --features lsp -- -D warnings",
+        "cargo fmt --check",
+        "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run",
+        "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run --features lsp",
+        "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run --release --run-ignored only -E 'test(budget)'",
+        "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm",
+        "mise run ts-build-wasm",
+        "mise run ts-test",
+        "mise run fmt-vact-check",
+        "mise run lint",
+        "cd editor && npm run check && npm test && npm run build"
+      ]
+    }
+  ]
+}

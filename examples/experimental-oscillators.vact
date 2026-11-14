@@ -1,0 +1,10 @@
+# Three paper-inspired oscillator studies: a VOSIM formant sweep, GENDYN spread, and scanned stiffness.
+use-bpm 100
+
+s :vosim > note [:c3 :eb3 :g3 :bb3] > vosim-formant [400 2000 800 1600] > vosim-pulses 4 > vosim-decay 0.65 > gain 0.16 > d1
+
+s :gendyn > note [:c3 :eb3 :g3 :bb3] > gendyn-spread 0 > gain 0.2 > d2
+s :gendyn > note [:c4 :eb4 :g4 :bb4] > gendyn-spread 0.6 > gain 0.1 > d3
+
+s :scanned > note [:c3 :eb3 :g3 :bb3] > scan-stiffness 0.2 > scan-damping 0.35 > gain 0.18 > d4
+s :scanned > note [:c4 :eb4 :g4 :bb4] > scan-stiffness 0.9 > scan-damping 0.35 > gain 0.13 > d5

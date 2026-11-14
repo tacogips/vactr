@@ -1,0 +1,14 @@
+# Original MusicDSP-inspired chebyshev synthesis, sample-free.
+# Run: target/debug/vactr run examples/synth-labs/chebyshev.vact --host native --cycles 16
+# Lorenz/Rossler are chaotic textures; note values do not imply tuned pitch.
+
+inst lab-chebyshev second: float = 0.6 fourth: float = -0.3:
+	chebyshev-osc freq harmonic-1: 1 harmonic-2: second harmonic-3: 0.4 harmonic-4: fourth harmonic-5: 0.2 harmonic-6: 0 harmonic-7: -0.15 harmonic-8: 0
+		> * {env-perc 0.01 0.45} > * amp
+
+use-bpm 120
+
+master:
+	limiter ceiling: -2 release: 0.08
+
+s :lab-chebyshev > note [:g2 nil :d3 :ab2] > second {range sine -0.5 0.8} > fourth {range sine -0.4 0.4} > gain 0.25 > d1

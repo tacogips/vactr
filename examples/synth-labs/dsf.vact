@@ -1,0 +1,14 @@
+# Original MusicDSP-inspired dsf synthesis, sample-free.
+# Run: target/debug/vactr run examples/synth-labs/dsf.vact --host native --cycles 16
+# Lorenz/Rossler are chaotic textures; note values do not imply tuned pitch.
+
+inst lab-dsf spacing: float = 1 rolloff: float = 0.72 count: float = 32:
+	dsf-osc freq spacing: spacing rolloff: rolloff count: count
+		> * {env-perc 0.01 0.45} > * amp
+
+use-bpm 120
+
+master:
+	limiter ceiling: -2 release: 0.08
+
+s :lab-dsf > note [:g2 nil :d3 :ab2] > spacing {range sine 0.6 2.4} > rolloff {range sine 0.4 0.9} > gain 0.25 > d1

@@ -1,0 +1,67 @@
+{
+  "name": "webkit",
+  "checks": [
+    {
+      "id": "canvas-only-text",
+      "pass": true,
+      "detail": "source chars=25; bridge opacity=0; canvas=767x842; line1=47,0,202,18; colors=349"
+    },
+    {
+      "id": "editing-undo-redo-navigation",
+      "pass": true,
+      "detail": "undo=10; redo=11; home=0; word=8; end=30"
+    },
+    {
+      "id": "clipboard-synthetic-event",
+      "status": "limitation",
+      "pass": null,
+      "detail": "WebKit synthetic ClipboardEvent cannot verify system clipboard contents; excluded from pass counts."
+    },
+    {
+      "id": "japanese-ime-synthetic",
+      "status": "limitation",
+      "pass": null,
+      "detail": "WebKit synthetic composition events cannot establish real IME commit behavior; excluded from pass counts."
+    },
+    {
+      "id": "touch-selection",
+      "pass": true,
+      "detail": "WebKit pointer event diagnostic=/Users/taco/gits/tacogips/vactr-worktrees/wf-dom-editor/tmp/canvas-cutover/evidence/s274-webkit-touch-events.json; {\"geometry\":{\"doc\":\"# canvas-visible-evidence\\n#e2e\",\"canvas\":{\"x\":0,\"y\":49,\"width\":767.40625,\"height\":842,\"top\":49,\"right\":767.40625,\"bottom\":891,\"left\":0},\"pane\":{\"x\":0,\"y\":49,\"width\":767.40625,\"height\":842,\"top\":49,\"right\":767.40625,\"bottom\":891,\"left\":0},\"touchX\":88,\"touchY\":59,\"word\":\"canvas\",\"wordStart\":2},\"tapSelection\":{\"anchor\":5,\"head\":5},\"atLongPress\":{\"selection\":{\"anchor\":2,\"head\":8},\"handles\":2,\"events\":[{\"type\":\"pointerdown\",\"constructor\":\"PointerEvent\",\"pointerType\":\"touch\",\"isPrimary\":true,\"pointerId\":1,\"button\":0,\"buttons\":1,\"width\":1,\"height\":1,\"timeStamp\":374},{\"type\":\"pointerup\",\"constructor\":\"PointerEvent\",\"pointerType\":\"touch\",\"isPrimary\":true,\"pointerId\":1,\"button\":0,\"buttons\":0,\"width\":1,\"height\":1,\"timeStamp\":377},{\"type\":\"pointerdown\",\"constructor\":\"PointerEvent\",\"pointerType\":\"touch\",\"isPrimary\":true,\"pointerId\":1,\"button\":0,\"buttons\":1,\"width\":1,\"height\":1,\"timeStamp\":431}]},\"atEnd\":{\"selection\":{\"anchor\":2,\"head\":8},\"handles\":2,\"events\":[{\"type\":\"pointerdown\",\"constructor\":\"PointerEvent\",\"pointerType\":\"touch\",\"isPrimary\":true,\"pointerId\":1,\"button\":0,\"buttons\":1,\"width\":1,\"height\":1,\"timeStamp\":374},{\"type\":\"pointerup\",\"constructor\":\"PointerEvent\",\"pointerType\":\"touch\",\"isPrimary\":true,\"pointerId\":1,\"button\":0,\"buttons\":0,\"width\":1,\"height\":1,\"timeStamp\":377},{\"type\":\"pointerdown\",\"constructor\":\"PointerEvent\",\"pointerType\":\"touch\",\"isPrimary\":true,\"pointerId\":1,\"button\":0,\"buttons\":1,\"width\":1,\"height\":1,\"timeStamp\":431},{\"type\":\"pointerup\",\"constructor\":\"PointerEvent\",\"pointerType\":\"touch\",\"isPrimary\":true,\"pointerId\":1,\"button\":0,\"buttons\":0,\"width\":1,\"height\":1,\"timeStamp\":954}]},\"handleWaitError\":null}"
+    },
+    {
+      "id": "context-loss-restore",
+      "pass": true,
+      "detail": "context-lost -> ready"
+    },
+    {
+      "id": "dpr-and-resize",
+      "pass": true,
+      "detail": "{\"actual\":1,\"effective\":1}"
+    },
+    {
+      "id": "visual-viewport-inset",
+      "pass": true,
+      "detail": {
+        "status": "pass",
+        "detail": "bridge bottom=67; inset height=360"
+      }
+    },
+    {
+      "id": "background-no-replay",
+      "pass": true,
+      "detail": "frames hidden=82, resumed=91"
+    },
+    {
+      "id": "dispose-ledger",
+      "pass": true,
+      "detail": "usedBytes=0"
+    }
+  ],
+  "passed": 8,
+  "total": 8,
+  "limitations": [
+    "WebKit synthetic ClipboardEvent cannot verify system clipboard contents; excluded from pass counts.",
+    "WebKit synthetic composition events cannot establish real IME commit behavior; excluded from pass counts.",
+    "WebKit touch selection uses synthetic pointer events."
+  ]
+}

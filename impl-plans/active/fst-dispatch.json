@@ -1,0 +1,350 @@
+{
+  "taskId": "fst",
+  "workflowMode": "issue-resolution",
+  "implementationBranch": "wf/syntax-fmt",
+  "baseBranch": "wf/syntax-fmt",
+  "remote": "origin",
+  "originalHead": "2793ce86fc4ac92b034a6dc07d120cf3b271341c",
+  "designDocPaths": [
+    "design-docs/specs/design-formatter-and-syntax.md",
+    "design-docs/specs/command.md",
+    "design-docs/specs/design-implementation.md",
+    "design-docs/specs/architecture.md",
+    "design-docs/user-qa/pending-formatter-syntax-questions.md",
+    "design-docs/user-qa/README.md",
+    "design-docs/references/README.md"
+  ],
+  "planIndexPath": "impl-plans/README.md",
+  "evidenceRoot": "tmp/fst",
+  "evidenceLayout": "tmp/fst/<planId>/attempt-<n>/ holds one full log per verification command, each ending with an exit=<status> line. Each plan's Progress Log records every command, its exit status and its log path. tmp/ is gitignored (**/tmp) and is never listed in writePaths. A missing or truncated log is not a pass. A step blocked by the sandbox (network, ~/.cache/tree-sitter, full nextest) is recorded as BLOCKED with the command, exit code and stderr; FST-40 reruns it.",
+  "executionModel": {
+    "waves": [
+      ["FST-10", "FST-11"],
+      ["FST-20", "FST-21", "FST-22", "FST-23"],
+      ["FST-30"],
+      ["FST-40"]
+    ],
+    "sameBranchFanout": true,
+    "worktrees": false,
+    "workersMayChangeGitState": false,
+    "commitOwner": "The orchestrator commits the accepted design and all plans before fanout, and commits implementation after review. Commit messages use the AGENTS.md 1-6 sections. Workers never commit, stash, checkout, reset, branch, push or merge. Only wf/syntax-fmt is pushed; never main.",
+    "retryPolicy": "Wave-2 plans share one cargo target dir. If cargo reports a build-directory lock, wait about 60 s and retry, up to 10 times, then record a blocker. A compile error located in another concurrent plan's writePaths (for example FST-21's `--features lsp` build compiling FST-20's in-progress src/cli, or FST-23's wasm build compiling FST-22's in-progress src/host/wasm) is transient: never edit that file; wait about 120 s and retry up to 10 times, then record it as BLOCKED for FST-40. npm commands in editor/ are run only by FST-23 (install) and FST-30 in a later wave, so they do not contend.",
+    "editProtocol": "Before each edit, re-read the file and record its sha256 and a one-line intent snapshot in the plan's Progress Log. After the edit, record the post-edit sha256. If the file drifted from the last recorded hash, stop and report. Never edit outside writePaths. Each worker edits only its own plan's Progress Log.",
+    "serialReconciliation": "FST-40 owns README.md, impl-plans/README.md, plan archiving, the design doc Status line, reruns of BLOCKED steps and the full gate. Formatting is limited to rustfmt on each plan's own .rs files. A defect found outside a worker's writePaths is recorded in that worker's Progress Log and repaired serially by FST-40 or by the orchestrator's review step, with file, cause, fix and pre/post sha256."
+  },
+  "reviewContext": {
+    "issueReference": "Add a .vact source formatter and a tree-sitter grammar that runs as WASM on the web (user request 2026-09-30; no GitHub number); workflow opus-luna-design-and-implement-review-loop-session-222; branch wf/syntax-fmt; plan review accepted in comm-002802",
+    "userProblem": "No .vact formatter exists although architecture.md and design-implementation.md 6.3 promise one, and the web editor has only a StreamLanguage highlighter. The user asked for a formatter and a tree-sitter syntax usable as WASM on the web, and asked whether tree-sitter (C) can run as WASM.",
+    "requiredOutcomes": [
+      "design-formatter-and-syntax.md answers the C/WASM question (section 2: yes; CLI 0.27.0 builds the C parser and scanner to .wasm without emscripten; web-tree-sitter 0.27.0 loads it) and is linked from the spec indexes.",
+      "Rust formatter core src/fmt (format, format_bytes) with guarantees G1-G7 tested over every committed .vact file, fixtures and a 2000-mutant test; reader-error input returned unchanged.",
+      "`vactr fmt [--check] [PATH...|-]` with exit codes 0/1/2/3 per command.md, covered by CLI tests.",
+      "LSP textDocument/formatting delegates to the formatter; applying the edits equals the formatter output (feature lsp tests).",
+      "wasm exports fmt_source, fmt_out_ptr and fmt_out_len in the host-wasm build; editor Shift-Alt-f format command covered by jsdom and real-wasm tests.",
+      "tree-sitter-vact/ grammar with a C external scanner, committed generated files, corpus, highlights.scm, parse-all over every committed .vact file with zero ERROR/MISSING nodes, and `tree-sitter build --wasm`; mise tasks ts-generate, ts-test, ts-build-wasm and fmt-vact-check.",
+      "Editor highlighting through web-tree-sitter 0.27.0 and highlights.scm, with the StreamLanguage mode as the default and fallback, and a node vitest that loads the grammar wasm.",
+      "The full gate in FST-40 (cargo build, clippy with and without lsp, cargo fmt --check, nextest with and without lsp, wasm32 build, mise tree-sitter tasks, editor check/test/build, mise run lint) passes."
+    ],
+    "nonGoals": [
+      "Long-line wrapping, intra-line spacing changes, range formatting.",
+      "locals.scm, indents.scm, grammar bindings, package.json in tree-sitter-vact/.",
+      "Incremental tree.edit highlighting, folding UI, format-on-save.",
+      "Reformatting the committed .vact files (F5); a separate follow-up may apply the formatter repo-wide.",
+      "tree-sitter as a Rust dependency; the Rust reader stays the language's source of truth."
+    ],
+    "constraints": [
+      "The formatter preserves semantics (sexpr print_all equality), is idempotent, preserves trivia and #@ placement, never panics, and refuses (returns the input unchanged) on reader errors.",
+      "The formatter core is wasm32-clean (--no-default-features --features host-wasm). No new Rust crate. tree-sitter is not a Rust dependency.",
+      "Pins: mise \"aqua:tree-sitter/tree-sitter\" = \"0.27.0\"; editor \"web-tree-sitter\": \"0.27.0\". No emscripten or docker.",
+      "The grammar parses every committed .vact file with zero ERROR and zero MISSING nodes.",
+      "The StreamLanguage mode stays as the fallback, and existing editor tests stay green unchanged.",
+      "Do not reformat committed .vact files. Rust files stay under 1000 lines. cargo runs with CARGO_TERM_QUIET=true.",
+      "writePaths and sharedPaths list only tracked source paths; never target/, editor/node_modules, editor/dist, tree-sitter-vact/node_modules, tmp/ or *.wasm.",
+      "Codex's sandbox keeps .git read-only and cannot bind localhost; full nextest runs happen outside it."
+    ],
+    "designDecisionsAndRationale": [
+      "Formatter gate (design 3.1): reader::read with FileId 1 and an empty AliasEnv; any Error diagnostic means Refused with byte-identical output, so the formatter never reasons about text the reader rejects.",
+      "Rules R1-R9 (design 3.3): tabs one per level, `>` continuation at F+1 carrying any block it opens, trailing blanks stripped except on directive lines, intra-line text untouched because whitespace is lexically significant, blank lines kept, per-line terminators kept, no wrapping. Minimal and least surprising.",
+      "Code-line levels via a frame stack (design 3.4) that mirrors layout.rs statement()/block(), so formatted output is a fixed point.",
+      "Comment-only lines use a binding-preserving indentation rule over the statement chain (design 3.5), so #@ directives keep their directives::attach target (G6).",
+      "LSP format_edits keeps its signature and is re-implemented on crate::fmt::format (design 3.7.2); wasm uses a raw ABI export fmt_source/fmt_out_ptr/fmt_out_len beside the existing session ABI (design 3.7.3).",
+      "Tree-sitter grammar is an editor-side superset (design 4.1) with a C scanner emitting NEWLINE/INDENT/DEDENT; built by CLI 0.27.0 which fetches wasi-sdk/binaryen, so no emscripten or docker (design 2, 6).",
+      "Editor keeps StreamLanguage as the default and swaps to tree-sitter only after the loader resolves (design 5.2); missing grammar wasm at build warns and falls back (F2).",
+      "Pending user decisions F1-F5 follow the recommendations by default (pending-formatter-syntax-questions.md)."
+    ],
+    "intentionalTradeoffs": [
+      "No intra-line spacing normalization (R6): less normalization in exchange for zero risk of changing lexing.",
+      "Blank-line runs are not collapsed (F1/R7), matching the interim LSP formatter and keeping all committed files fixed points.",
+      "Sources using console-bound import aliases are refused (F4), because they are also load errors as files.",
+      "Highlighting reparses the whole document instead of incremental tree.edit, for simplicity in v1.",
+      "Command naming drift: design 3.7.1 says Command::Fmt { check, inputs } while FST-20 pins Command::Fmt { check, input: FmtInput }; the plan contract governs and FST-40 may align the design text."
+    ],
+    "supportedEdgeCases": [
+      "`>` continuation lines at any original depth, including continuations that open `:` blocks.",
+      "Own-line comments and #@ directives at odd indentation, including tab/space mixes on comment-only lines.",
+      "Pairs `name: value`, lambdas `->:`, `:kw:` block openers, `slot :drums gain: 0.8:`, if/elif/else chains.",
+      "Strings with nested interpolation, escapes, `#` and `}` inside strings; path and url literals; ratio and negative numbers; `_` and `_1`; qualified identifiers; `a->b`; `>=` at a line start.",
+      "CRLF line ends, missing final newline, whitespace-only lines, empty input, leading blank lines.",
+      "Reader-error input (mixed indentation on code lines, unterminated strings, unbound qualifiers) is returned unchanged; non-UTF-8 bytes return status 2 from format_bytes.",
+      "Grammar wasm missing or failing to load in the editor: StreamLanguage fallback."
+    ],
+    "outOfScopeEdgeCases": [
+      "Wrapping or reflowing long lines.",
+      "Formatting a selected range only.",
+      "Formatting sources the reader rejects, including console-alias-dependent documents.",
+      "Tree-sitter-based indentation, locals or folding queries."
+    ],
+    "residualRisks": [
+      "Scanner/reader disagreement on edge layout forms; mitigated by the corpus and parse-all.",
+      "The runtime wasm name in web-tree-sitter 0.27.0 must be confirmed from the installed package.",
+      "The Codex sandbox may block npm network access or ~/.cache/tree-sitter; such steps are recorded BLOCKED and rerun by FST-40.",
+      "FST-10 mutation test 10 s debug budget may be tight given src/prelude/templates.vact (54,788 bytes); weight mutants toward smaller files if needed.",
+      "ts-test fails if query output prints 'error'; highlight-sample.txt must not contain that word.",
+      "FST-21: on whitespace-only lines the indent-run edit and the trailing-blank edit could overlap; covered by the existing test and the apply==format corpus test.",
+      "How tree-sitter CLI 0.27.0 selects the language for parse/query outside the grammar dir is unconfirmed; FST-11 checks --help and routes failures to BLOCKED for FST-40."
+    ],
+    "sourcePaths": [
+      "design-docs/specs/design-formatter-and-syntax.md",
+      "design-docs/user-qa/pending-formatter-syntax-questions.md",
+      "design-docs/specs/command.md",
+      "design-docs/specs/design-implementation.md",
+      "design-docs/specs/architecture.md",
+      "src/reader/mod.rs",
+      "src/reader/lexer.rs",
+      "src/reader/layout.rs",
+      "src/reader/node.rs",
+      "src/reader/sexpr.rs",
+      "src/directives/attach.rs",
+      "src/cli/args.rs",
+      "src/cli/mod.rs",
+      "src/lsp/analysis.rs",
+      "src/lsp/server.rs",
+      "src/host/wasm/abi.rs",
+      "editor/src/code/language.ts",
+      "editor/src/code/mount.ts",
+      "editor/test/support/wasm.ts",
+      "examples",
+      "src/prelude/templates.vact"
+    ]
+  },
+  "plans": [
+    {
+      "planId": "FST-10",
+      "planPath": "impl-plans/active/fst-10-fmt-core.md",
+      "dependsOn": [],
+      "writePaths": ["src/lib.rs", "src/fmt", "impl-plans/active/fst-10-fmt-core.md"],
+      "sharedPaths": ["src/reader/mod.rs", "src/reader/lexer.rs", "src/reader/layout.rs", "src/reader/node.rs", "src/reader/sexpr.rs", "src/directives/attach.rs", "src/types/manifest.rs", "src/types/diag.rs", "examples", "src/prelude/templates.vact"],
+      "sharedPathNotes": [
+        {"path": "src/lib.rs", "intendedEdit": "Add exactly one line `pub mod fmt;` between `pub mod expand;` and `pub mod host;`, with no cfg."},
+        {"path": "src/directives/attach.rs", "intendedEdit": "Read-only; used as the G6 oracle in tests only."},
+        {"path": "examples", "intendedEdit": "Read-only test inputs; never reformatted."}
+      ],
+      "acceptanceCriteria": [
+        "The src/fmt contract matches the pinned signatures exactly (format, Formatted, Outcome, format_bytes).",
+        "All listed fixtures exist with hand-written .out files.",
+        "G1-G7 are asserted over every committed .vact file and every clean fixture; the fixed-point check passes or a finding is recorded.",
+        "The mutation test (2000 mutants) passes.",
+        "src/fmt builds for wasm32-unknown-unknown with --no-default-features --features host-wasm; every src/fmt file is under 1000 lines."
+      ],
+      "verification": [
+        "CARGO_TERM_QUIET=true cargo build",
+        "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run fmt::",
+        "CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings",
+        "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm",
+        "cargo fmt --check",
+        "wc -l src/fmt/*.rs src/fmt/tests/*.rs"
+      ]
+    },
+    {
+      "planId": "FST-11",
+      "planPath": "impl-plans/active/fst-11-ts-grammar.md",
+      "dependsOn": [],
+      "writePaths": ["tree-sitter-vact", "mise.toml", ".gitignore", "impl-plans/active/fst-11-ts-grammar.md"],
+      "sharedPaths": ["src/reader/lexer.rs", "src/reader/pathlit.rs", "src/reader/layout.rs", "editor/src/code/language.ts", "examples", "src/prelude/templates.vact"],
+      "sharedPathNotes": [
+        {"path": "mise.toml", "intendedEdit": "Add the [tools] pin \"aqua:tree-sitter/tree-sitter\" = \"0.27.0\" and the tasks ts-generate, ts-test, ts-build-wasm and fmt-vact-check. No other change."},
+        {"path": ".gitignore", "intendedEdit": "Append a '## tree-sitter build outputs' block with tree-sitter-vact/*.wasm and tree-sitter-vact/build/."}
+      ],
+      "acceptanceCriteria": [
+        "All authored grammar files exist (grammar.js, src/scanner.c, tree-sitter.json, queries/highlights.scm, test/corpus, test/highlight-sample.txt, scripts/parse-all.sh) and the generated files come from CLI 0.27.0.",
+        "The contract's node types and highlight captures match exactly.",
+        "ts-generate is reproducible, ts-test passes the corpus, compiles the query and parses at least 10 committed .vact files with no ERROR/MISSING, and ts-build-wasm produces a wasm with the magic bytes; otherwise specific steps are recorded BLOCKED for FST-40.",
+        "Only the stated blocks changed in mise.toml and .gitignore, and no .wasm output is tracked."
+      ],
+      "verification": [
+        "mise install",
+        "mise exec -- tree-sitter --version",
+        "mise run ts-generate",
+        "mise run ts-test",
+        "mise run ts-build-wasm",
+        "git status --short -- tree-sitter-vact",
+        "mise tasks ls"
+      ]
+    },
+    {
+      "planId": "FST-20",
+      "planPath": "impl-plans/active/fst-20-fmt-cli.md",
+      "dependsOn": ["FST-10"],
+      "writePaths": ["src/cli/args.rs", "src/cli/mod.rs", "src/cli/fmt.rs", "src/cli/tests/mod.rs", "src/cli/tests/args.rs", "src/cli/tests/fmt.rs", "impl-plans/active/fst-20-fmt-cli.md"],
+      "sharedPaths": ["src/fmt/mod.rs", "src/session/console.rs", "src/cli/get.rs", "src/cli/run.rs", "mise.toml"],
+      "sharedPathNotes": [
+        {"path": "src/cli/mod.rs", "intendedEdit": "Add `mod fmt;` and the `Ok(Command::Fmt { check, input }) => fmt::main(check, &input, &cwd)` arm only."},
+        {"path": "mise.toml", "intendedEdit": "Read-only; runs `mise run fmt-vact-check` (defined by FST-11) as verification."}
+      ],
+      "acceptanceCriteria": [
+        "Command::Fmt and FmtInput match the contract, and USAGE lists fmt.",
+        "`vactr fmt --check` exits nonzero when a file would change and zero otherwise; `vactr fmt PATH` rewrites in place; `vactr fmt -` reads stdin and writes stdout; all covered by CLI tests.",
+        "The exit-code precedence matches command.md.",
+        "All committed .vact files pass fmt-vact-check, or offending paths are recorded as findings without reformatting."
+      ],
+      "verification": [
+        "CARGO_TERM_QUIET=true cargo build",
+        "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run cli::",
+        "CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings",
+        "cargo fmt --check",
+        "mise run fmt-vact-check",
+        "printf 's :bd\\n\\t\\t\\t> d1\\n' | cargo run --quiet -- fmt -",
+        "wc -l src/cli/args.rs src/cli/fmt.rs src/cli/tests/args.rs src/cli/tests/fmt.rs"
+      ]
+    },
+    {
+      "planId": "FST-21",
+      "planPath": "impl-plans/active/fst-21-fmt-lsp.md",
+      "dependsOn": ["FST-10"],
+      "writePaths": ["src/lsp/analysis.rs", "src/lsp/tests/analysis.rs", "impl-plans/active/fst-21-fmt-lsp.md"],
+      "sharedPaths": ["src/fmt/mod.rs", "src/fmt/tests/fixtures", "src/lsp/convert.rs", "src/lsp/server.rs"],
+      "sharedPathNotes": [
+        {"path": "src/lsp/analysis.rs", "intendedEdit": "Re-implement only `format_edits` (and its private helpers) on crate::fmt::format; keep the signature."},
+        {"path": "src/lsp/tests/analysis.rs", "intendedEdit": "Keep formatting_changes_only_whitespace_and_keeps_directive_lines unchanged; append the new tests."}
+      ],
+      "acceptanceCriteria": [
+        "format_edits delegates to crate::fmt::format, keeps its signature, and returns no edits when the outcome is Refused.",
+        "Applying the edits reproduces the formatter's output exactly for every committed file and fixture.",
+        "The existing formatting test passes unchanged; both files stay under 1000 lines."
+      ],
+      "verification": [
+        "CARGO_TERM_QUIET=true cargo build --features lsp",
+        "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run --features lsp lsp::",
+        "CARGO_TERM_QUIET=true cargo clippy --all-targets --features lsp -- -D warnings",
+        "CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings",
+        "cargo fmt --check",
+        "wc -l src/lsp/analysis.rs src/lsp/tests/analysis.rs"
+      ]
+    },
+    {
+      "planId": "FST-22",
+      "planPath": "impl-plans/active/fst-22-fmt-wasm.md",
+      "dependsOn": ["FST-10"],
+      "writePaths": ["src/host/wasm/mod.rs", "src/host/wasm/fmt_abi.rs", "impl-plans/active/fst-22-fmt-wasm.md"],
+      "sharedPaths": ["src/host/wasm/abi.rs", "src/host/mod.rs", "src/fmt/mod.rs"],
+      "sharedPathNotes": [
+        {"path": "src/host/wasm/mod.rs", "intendedEdit": "Add `pub mod fmt_abi;` in alphabetical order and one module-doc line."}
+      ],
+      "acceptanceCriteria": [
+        "The exports fmt_source, fmt_out_ptr and fmt_out_len exist with the pinned signatures and are gated only through host/wasm.",
+        "The export listing prints `fmt_out_len fmt_out_ptr fmt_source session_init`.",
+        "A node smoke call formats a continuation sample with status 0 and returns status 1 with the input unchanged for an unterminated string.",
+        "The native build and cargo fmt --check still pass."
+      ],
+      "verification": [
+        "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm",
+        "CARGO_TERM_QUIET=true cargo clippy --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm -- -D warnings",
+        "node --input-type=module -e \"import fs from 'node:fs'; const m = await WebAssembly.compile(fs.readFileSync('target/wasm32-unknown-unknown/debug/vactr.wasm')); console.log(WebAssembly.Module.exports(m).map(e => e.name).filter(n => n.startsWith('fmt_') || n === 'session_init').sort().join(' '))\"",
+        "CARGO_TERM_QUIET=true cargo build",
+        "cargo fmt --check"
+      ]
+    },
+    {
+      "planId": "FST-23",
+      "planPath": "impl-plans/active/fst-23-editor-syntax.md",
+      "dependsOn": ["FST-11"],
+      "writePaths": ["editor/src/code/syntax.ts", "editor/src/code/mount.ts", "editor/src/app/main.ts", "editor/src/app/deps.ts", "editor/vite.config.ts", "editor/package.json", "editor/package-lock.json", "editor/test/code/syntax.test.ts", "editor/test/code/syntax-fallback.test.ts", "impl-plans/active/fst-23-editor-syntax.md"],
+      "sharedPaths": ["tree-sitter-vact/queries/highlights.scm", "tree-sitter-vact/src/node-types.json", "editor/src/code/language.ts", "editor/test/support/wasm.ts", "editor/test/code/transport.test.ts", "editor/test/app/main.test.ts", "examples", "src/prelude/templates.vact"],
+      "sharedPathNotes": [
+        {"path": "editor/src/code/mount.ts", "intendedEdit": "Only the language Compartment around vactLanguage(), codePane.dataset.syntax, and the deps.syntax loader wiring."},
+        {"path": "editor/src/app/main.ts", "intendedEdit": "In boot(), set deps.syntax = () => loadVactSyntax(win.document.baseURI) in both tiers."},
+        {"path": "editor/src/app/deps.ts", "intendedEdit": "Add the optional `syntax?: SyntaxLoader` field to EditorDeps."},
+        {"path": "editor/package-lock.json", "intendedEdit": "Changed only by `npm install --save-exact web-tree-sitter@0.27.0`; never hand-edited."}
+      ],
+      "acceptanceCriteria": [
+        "The syntax contract is implemented, and CAPTURE_CLASSES covers every capture in highlights.scm.",
+        "StreamLanguage is the default; the tree-sitter path is used only after the loader resolves, and a failed load keeps the fallback (syntax-fallback.test.ts).",
+        "A node vitest loads tree-sitter-vact.wasm with web-tree-sitter and asserts parse trees and highlight captures (syntax.test.ts).",
+        "web-tree-sitter is pinned at exactly 0.27.0 and the lockfile was updated by npm; vite serves the grammar wasm, highlights.scm and the runtime wasm in dist.",
+        "Existing editor tests pass unchanged; syntax.ts and mount.ts stay under 400 lines."
+      ],
+      "verification": [
+        "mise run ts-build-wasm",
+        "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm",
+        "cd editor && npm install --save-exact web-tree-sitter@0.27.0",
+        "grep '\"web-tree-sitter\": \"0.27.0\"' editor/package.json",
+        "cd editor && npm run check",
+        "cd editor && npm test",
+        "cd editor && VACTR_REQUIRE_SESSION_ABI=1 npm run build",
+        "wc -l editor/src/code/syntax.ts editor/src/code/mount.ts"
+      ]
+    },
+    {
+      "planId": "FST-30",
+      "planPath": "impl-plans/active/fst-30-editor-format.md",
+      "dependsOn": ["FST-22", "FST-23"],
+      "writePaths": ["editor/src/code/format.ts", "editor/src/code/mount.ts", "editor/src/app/main.ts", "editor/src/app/deps.ts", "editor/test/code/format.test.ts", "editor/test/wasm/format.test.ts", "impl-plans/active/fst-30-editor-format.md"],
+      "sharedPaths": ["editor/test/support/wasm.ts", "editor/test/wasm/first-track.test.ts", "editor/src/code/syntax.ts", "src/fmt/tests/fixtures"],
+      "sharedPathNotes": [
+        {"path": "editor/src/code/mount.ts", "intendedEdit": "Add formatKeymap(() => deps.formatter) before defaultKeymap only."},
+        {"path": "editor/src/app/main.ts", "intendedEdit": "In boot(), set deps.formatter = new WasmFormatter(new URL('vactr.wasm', baseURI).href) in both tiers."},
+        {"path": "editor/src/app/deps.ts", "intendedEdit": "Add the optional `formatter?: Formatter` field to EditorDeps."}
+      ],
+      "acceptanceCriteria": [
+        "Formatter, WasmFormatter, formatDocument and formatKeymap match the contract.",
+        "Shift-Alt-f formats the document in both tiers, verified with a fake formatter (jsdom) and with the real vactr.wasm (node).",
+        "The full editor suite, including FST-23's syntax tests, passes after the shared mount.ts/main.ts/deps.ts edits; format.ts and mount.ts stay under 400 lines."
+      ],
+      "verification": [
+        "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm",
+        "mise run ts-build-wasm",
+        "cd editor && npm run check",
+        "cd editor && npm test",
+        "cd editor && VACTR_REQUIRE_SESSION_ABI=1 npm run build",
+        "wc -l editor/src/code/format.ts editor/src/code/mount.ts"
+      ]
+    },
+    {
+      "planId": "FST-40",
+      "planPath": "impl-plans/active/fst-40-closeout.md",
+      "dependsOn": ["FST-10", "FST-11", "FST-20", "FST-21", "FST-22", "FST-23", "FST-30"],
+      "writePaths": ["README.md", "impl-plans/README.md", "impl-plans/active", "impl-plans/completed", "design-docs/specs/design-formatter-and-syntax.md"],
+      "sharedPaths": ["src/fmt", "src/cli", "src/lsp", "src/host/wasm", "tree-sitter-vact", "editor/src", "editor/test", "mise.toml", ".gitignore"],
+      "sharedPathNotes": [
+        {"path": "README.md", "intendedEdit": "Add a Formatting section and a Syntax (tree-sitter) section, and add `mise run ts-build-wasm` to the editor build block."},
+        {"path": "design-docs/specs/design-formatter-and-syntax.md", "intendedEdit": "Status line only: implemented date and commit; may align the Command::Fmt field name with FST-20."},
+        {"path": "src/fmt", "intendedEdit": "Read-only unless a serial repair is recorded (file, cause, fix, pre/post sha256)."}
+      ],
+      "acceptanceCriteria": [
+        "Every BLOCKED step from FST-10..30 has been rerun, with its exit status and log.",
+        "Gate commands 1-13 pass, each with a complete log.",
+        "The README documents `vactr fmt` and the grammar tasks, and the design doc Status line is updated.",
+        "Every FST plan is marked Completed, the impl-plans/README.md rows are updated, and the plans are archived by the orchestrator."
+      ],
+      "verification": [
+        "CARGO_TERM_QUIET=true cargo build",
+        "CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings",
+        "CARGO_TERM_QUIET=true cargo clippy --all-targets --features lsp -- -D warnings",
+        "cargo fmt --check",
+        "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run",
+        "NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run --features lsp",
+        "CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm",
+        "mise run ts-generate",
+        "mise run ts-test",
+        "mise run ts-build-wasm",
+        "mise run fmt-vact-check",
+        "cd editor && npm run check",
+        "cd editor && npm test",
+        "cd editor && VACTR_REQUIRE_SESSION_ABI=1 npm run build",
+        "mise run lint",
+        "git diff --check",
+        "git status --short"
+      ]
+    }
+  ]
+}

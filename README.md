@@ -1,0 +1,541 @@
+# Vactr
+
+[Japanese documentation](README.jd.md)
+
+Vactr is a live-coding language for music and visuals: declarative,
+statically typed with inference, written in Rust, targeting the browser
+(Wasm), macOS, iPad, and iPhone. See `design-docs/specs/` for the
+specification.
+
+## Status
+
+The language front end, middle end, runtime back end, session layer and
+editor are implemented (`impl-plans/active/vactr-core.md` TASK-001..010).
+Every top-level form goes read -> expand -> check -> compile -> run, and
+bound patterns are scheduled into audio, MIDI and OSC sinks. The
+`vactr` binary provides `repl`, `run`, `serve`, `get`, `fmt` and `lsp`. The
+editor lives in `editor/` (see "Editor" below).
+
+Front end (TASK-001..003):
+
+- `src/value/`: the core value model. It covers value tagging, structural
+  equality, dicts as sorted maps (key-ordered iteration and `put`), exact
+  self-reducing ratio arithmetic, int/float widening, and `path`/`url`
+  values.
+- `src/reader/`: reads `.vact` source into S-expression nodes with
+  byte-accurate spans. It covers indentation blocks, `{}` nesting, pipe
+  continuation lines, and `#@` directives kept as trivia. `( )` is a
+  reader error. Unquoted paths (`./x ../x ~/x /abs/x`) and `scheme://`
+  urls are literals; `#` ends a url.
+- `src/expand/`: expands `if`/`elif` into `match` and `for` into `map`.
+  Its output uses kernel forms only, and malformed forms produce
+  diagnostics that point at their origin.
+
+Middle end (TASK-004..006):
+
+- `src/types/`: the static checker with inference, the forcing masks and
+  the native signature table. Scopes chain as prelude (read-only) ->
+  session -> fn/block: rebinding a name in the same scope is an error,
+  shadowing a prelude name is a hint, and shadowing a user-defined parent
+  name is a warning. It enforces SOUND FIRST (`n [..] > s :x` and
+  `note [..] > s :x` are errors), checks `s` keywords against the
+  late-bound `sound-kit` prelude binding, types `load path` and
+  `sample path`, and diagnoses a bare field-less enum variant used as a
+  binding pattern in `if`/`match`.
+- `src/ns/`, `src/compile/`, `src/vm/`: namespaces and tweak slots, the
+  reactive dependency graph and the top-level `Evaluator`, the bytecode
+  compiler, and the VM with the core and domain natives.
+- `src/pattern/`, `src/clock/`, `src/tex/`: the pattern engine and
+  signals (the first list-valued step after `s` gives the structure;
+  `midi-notes` is a structure-giving step), the cycle clock, and the
+  visual chains with their shader and uniform plans.
+- Microtonal tuning and chord performance
+  ([design](design-docs/specs/design-tuning-and-strum.md),
+  `lang-reference.md` section 6): `tune` applies an `edo` (including
+  non-octave periods such as Bohlen-Pierce), a `ratios` just-intonation
+  list, inline `scala` text with an optional `.kbm` mapping, a
+  `load-scala` file (needs a host source loader), or a preset (`:ji-5`, `:ji-7`, `:partch-43`,
+  `:bohlen-pierce`). `scale`, `chord` and `voicing` resolve through the
+  active tuning, and microtonal scale presets such as `:edo19-major`,
+  `:maqam-rast`, `:slendro` and `:bp-lambda` work with `scale`. `strum`
+  spreads chord tones in time (`:up`, `:down`, `:alternate`, `:random`;
+  curves `:flat`, `:fade`, `:swell`), `harp` plays a position across a
+  multi-octave chord plate, `inversion` rotates chord tones by tuning
+  periods, and `perform` composes chord, voicing and inversion, then
+  plays a block, strum, arp or harp mode.
+  Without `tune`, output is bit-identical 12-TET. MIDI out sends the
+  nearest 12-TET note with no pitch bend. See
+  `examples/microtonal-tuning.vact` and `examples/strum-harp.vact`.
+
+Core modules use no OS threads and no I/O. Threads, files, sockets and
+child processes are used only in `src/host/native/`, `src/pkg/native/`,
+`src/cli/` and `src/lsp/`.
+
+Back end (TASK-007..008):
+
+- `src/sched/`: the scheduler and slot table (d1..d9, `slot`, `out`), the
+  two-horizon staging buffer with occurrence merge, commit-time control
+  cells, slot generations with the two-class control channel, `once`/`at`,
+  dry run in Query effect mode, telemetry, MIDI input draining and MIDI
+  clock slave/master.
+- `src/dsp/`: the DSP engine (voice pool, event ring, graph and bus graph,
+  ugen and effect catalogs, synthesis templates, analyzers writing f32
+  cells, the granular engine with live-bus capture) with no allocation or
+  locking on the audio callback. UGen nodes declare typed mono or stereo
+  outputs (up to 4 per node). In `.vact`, calling a multi-output node
+  value with an output keyword or index selects that output (`(p :aux)`,
+  `(p 1)`), and an unselected use means the first output. Stereo voices
+  keep both channels through voice-local effects. Stereo and main/aux
+  voices pan with unity-center balance, and mono voices keep equal-power
+  pan. The graph codec carries output shapes and edge output indexes, so
+  native and browser peers of the same revision render the same graph
+  (design `design-docs/specs/design-mutable-audio.md`, MOD-004).
+  The 24 templates that cover the Plaits engine positions share an
+  opt-in voice layer (trigger, decay envelope and low-pass gate) on
+  their main and aux outputs. It is controlled by `lpg-mode` (`:off`,
+  `:ping`, `:level`),
+  `lpg-decay` and `lpg-color`. The default `lpg-mode: :off` is an exact
+  pass-through, so existing templates keep their sound. The layer is
+  labelled source-stage against the pinned reference by
+  `mise run compare-plaits-voice`; it is not a full source port
+  (design PLV-001, `examples/voice-layer.vact`).
+- [music-things](https://github.com/tacogips/music-things): the synth and
+  effect DSP kernels live in three reusable crates in that repository, with
+  no external dependencies and no vactr types, each building natively and
+  for `wasm32-unknown-unknown`. `music-things-dsp` holds shared primitives,
+  FFT and sample views. `music-things-synth` holds oscillator, drum, voice
+  and Mutable Instruments-derived kernels. `music-things-fx` holds effect
+  groups, granular and effect-kind dispatch. vactr depends on them as git
+  dependencies pinned by revision in `Cargo.toml` (vactr's tests enable
+  their `test-support` feature through `[dev-dependencies]`). `src/dsp`
+  keeps the engine, catalogs, codec and the ported coverage manifest. Its
+  old module paths re-export the crates or wrap them in thin adapters, so
+  audio output is bit-identical. Provenance for the moved code is in the
+  music-things `THIRD_PARTY_NOTICES.md` (design
+  `design-docs/specs/design-music-things-extraction.md`).
+- Bass voices ([design](design-docs/specs/design-bass-voices.md)):
+  `analog-bass` (modeled ladder), `acid-bass` (diode ladder), `fm-bass`
+  (feedback FM), `wobble-bass` (tempo-synced filter), `sub-bass` (sine
+  sub) and `reese-bass` (detuned saws), all rendered by one `bass-core`
+  kernel. Acid slide uses `slide-from` semitones with `cut 1`;
+  `gate-length` is measured in sixteenth-steps. Synced wobble divisions
+  use `lfo-rate` cycles per pattern cycle (1 = 1/1, 2 = 1/2, 4 = 1/4,
+  8 = 1/8, 6 = 1/4T, 12 = 1/8T with the default 4-beat cycle) and stay
+  beat-locked over long playback; set `lfo-sync false` for free-rate Hz.
+  See `examples/bass-presets.vact` (19 named patches) and
+  `examples/acid-techno.vact`, `examples/rumble-techno.vact`,
+  `examples/offbeat-bass-techno.vact`, `examples/wobble-techno.vact`.
+  Render one with `vactr run examples/acid-techno.vact --cycles N`
+  (see Development).
+- Six-operator FM extends `fm` with algorithm 0 as the legacy sound and
+  algorithms 1..32 as six-operator topologies. `fm6-core` accepts a `patch:`
+  list, and native hosts can read user-supplied files with `fm6-sysex`.
+  New voices are `kalimba`, `tonewheel-organ`, `hurdy-gurdy`, `vosim`,
+  `gendyn` and `scanned`. See
+  [the design](design-docs/specs/design-fm1-voices.md) and the
+  [FM6 algorithm](examples/fm6-algorithms.vact), [kalimba](examples/kalimba.vact),
+  [tonewheel organ](examples/tonewheel-organ.vact),
+  [hurdy-gurdy](examples/hurdy-gurdy.vact) and
+  [experimental oscillator](examples/experimental-oscillators.vact) examples.
+- `src/host/`: capability traits and `NoopHost`; `native/` (cpal, timer
+  tick, midir, WAV loader) behind the `host-native` feature; `wasm/` (raw
+  ABI, control-cell mirror protocol, resource lifecycle) behind `host-wasm`
+  with the AudioWorklet glue in `editor/worklet/` and the browser lifecycle
+  harness in `editor/dev-harness/`.
+- `examples/beep.rs`: one event end to end on the native host
+  (`cargo run --example beep`; audible check pending).
+
+Session layer (TASK-009):
+
+- `src/session/`: `Session` wraps the evaluator and the runtime. It holds
+  the per-form eval pipeline and the reactive `bindings` publication (one
+  batch per completed pass, so no provisional value leaks). It also
+  contains the edit-epoch and doc-revision write authority, the
+  `ClientMsg`/`ServerMsg` JSON protocol (v1), and the REPL console.
+- `src/pkg/`: Go-style packages (`import github.com/owner/name`). It
+  covers `vactr.toml`, `vactr.lock`, git-tag semver with minimal
+  version selection, the canonical length-prefixed sha256 digest,
+  archive safety checks (traversal, absolute paths, escaping symlinks,
+  case-fold duplicates, size limits) and atomic cache staging. Native
+  git and local-directory stores and the `~/.vactr/pkg` cache live in
+  `pkg/native/`. A running session never fetches; `vactr get` does.
+- `src/directives/`: `#@` directive comments. It covers block
+  attachment, labels (`#@ name X`, `label:`), addressed `label.param`
+  directives, `BindingKey`, and both binding persistence modes.
+  `DirectivePersistence` is the default and keeps panel membership and
+  MIDI mappings in the source as `#@` comments.
+  `ExternalFilePersistence` is optional and uses `<doc>.bindings.json`.
+- Self-analysis: `scope :bus n`, `spectrum :bus bins:`, `capture :bus
+  cycles` and `render cycles`, plus `rms`/`peak`/`spectrum`/`scope` over
+  sample values. The checker types them and the REPL can call them.
+  Offline `render` never mutates the live runtime. Taps and render need
+  the native tier. The browser tier and builds without `host-native`
+  fail the call with `beyond-capability`.
+- `src/cli/`: the `vactr` verbs and the native session socket
+  (loopback only, token in the URL, HTTP 401 on a bad token or path, at
+  most 8 connections, 1 MiB frames).
+- `src/lsp/`: `vactr lsp` over stdio (tower-lsp, `lsp` feature). It can
+  attach to a running `serve` socket with `--session`. Its
+  `textDocument/formatting` uses the formatter in `src/fmt/`, and
+  `textDocument/completion` uses the engine in `src/complete/`.
+- `src/fmt/`: the `.vact` source formatter (layout whitespace only;
+  wasm32-clean), shared by `vactr fmt`, the LSP and the editor.
+- `src/complete/`: the context-aware, scope-aware, ranked completion
+  engine (wasm32-clean), shared by the LSP and editor through the
+  `complete_source` export.
+
+The CLI and the session protocol are specified in
+`design-docs/specs/command.md`. The audible REPL check (a REPL-bound
+pattern sounding on the native host) is pending user confirmation. Its
+automated proxy is a recording-host test.
+
+## Editor
+
+The editor (TASK-010/011, design `design-docs/specs/design-implementation.md`
+15.1, 15.2, 15.3) is a Vite + TypeScript app in `editor/` with Solid.js
+views and a WebGL2 canvas code surface. Code text, cursor, selection,
+syntax, diagnostics and playing highlights are drawn on the canvas; the
+DOM only bridges input, IME, clipboard and accessibility. A headless
+`@codemirror/state` EditorState is the single document authority (with
+revisions and undo/redo); production code imports no `@codemirror/view`.
+One frontend speaks Session Protocol v1 over two transports:
+
+- Browser tier (default): the wasm core runs a `Session` on the main
+  thread (`src/host/wasm/session_half.rs`) and audio runs in the
+  AudioWorklet (`editor/worklet/`).
+- Native tier: open the page with `?session=<ws-url>`, using the URL that
+  `vactr serve` prints (token included). The page then drives the
+  native engine over the loopback WebSocket.
+
+The transport, code mount point, slider and directive rows, parameter pane
+and handles, read-only grid and roll, analyzer displays, visual panes,
+sample browser, and package pane are Solid views. Protocol, binding
+write-back, the document state, canvas drawing, and the WebGL2 render host
+remain in TypeScript hosts.
+
+Live performance supports right-drag on a bound number (two-finger
+drag on iPad) for a momentary tweak without editing the text. On release,
+the value glides back over the "momentary glide" setting (default 1 s); hold
+Shift to snap back.
+
+It provides:
+
+- a transport bar of icons (design 15.2): the audio control (click to
+  start; shows off / running / suspended / failed with the reason), Run
+  (evaluate the whole document), the eval outcome (ok, diagnostics count,
+  or not delivered), tempo, cycle.beat with a beat ring, clock source,
+  gentle stop (`Mod-.`, effect tails ring out) and cut/hush
+  (`Mod-Shift-.`); every icon has a tooltip;
+- a side column that folds to a rail (button or `Mod-\\`) with sections
+  that fold individually, remembered per browser;
+- the `.vact` mode (tree-sitter highlighting once `tree-sitter-vact.wasm`
+  loads, parsed in a Worker off the keystroke path; a line-local fallback
+  tokenizer otherwise), eval keybindings and flash, a format command on
+  `Shift-Alt-f` (the wasm formatter), and inline diagnostics (the browser
+  check runs on a typing pause, after the next presented frame); a
+  completion popup appears while typing, `Ctrl-Space` opens it manually,
+  Arrow/PageUp/PageDown move, `Enter`/`Tab` accept, and `Escape` closes it;
+- an optional Vim mode (off by default; the vim button in the transport
+  bar), described below;
+- playing-step highlighting on the audible clock (playing events are
+  announced ahead within the scheduling lookahead and shown at their
+  audible time, never early), and the transport bar;
+- the right-pane slider panel (source-edit and overlay modes), the
+  `#@` directive control panel, drag on literals and WebMIDI learn;
+- parameter editors from `EditorDecl`/`ParamMeta`, and the display-only
+  step grid and piano roll;
+- analyzer meters and scopes from the analysis cells;
+- visual panes o0..o3 on a WebGL2 render host;
+- the package import pane and the sample browser.
+
+The Documents picker opens registered examples, browser-saved documents, or
+files, and can set or reset the default template. Opening a document replaces
+the buffer as one undoable step (Mod-Z restores the previous text) and never
+starts playback; press Play to hear it. The built-in default is
+`examples/showcase.vact`. Only examples that evaluate in the browser tier are
+listed; examples that need a four-output native host, external samples or
+song transport are excluded with a recorded reason in
+`editor/src/examples/manifest.ts`. Every template voice the prelude realizes
+in a tier (for example `phase-drum`, `analog-bass`, `vosim`, `kalimba`) is a
+valid `s :name` sound there, in both the eval check and the editor's static
+check ([design](design-docs/specs/design-browser-tier-voices.md)), so the
+bass and FM voice examples are listed. On startup, an explicit
+`?example=<id>` URL takes precedence, followed on the web by the unsaved draft,
+then the chosen default template, then the built-in showcase. Web drafts,
+named documents, and the default template use versioned `vactr.doc.v1.*`
+localStorage keys. Documents over 262144 characters are not stored there, and
+unavailable or full browser storage leaves the editor usable while showing a
+status message. The app stores its default template at
+`<app config dir>/default-template.json`. Run `npm run e2e:examples` from
+`editor/` to verify the picker, persistence, startup, and silent audio path.
+
+### Editor backgrounds and visualizers
+
+Use own-line `#@ editor` JSON comments to save appearance with a document:
+
+```vactr
+#@ editor {"background":{"kind":"image","src":"/examples/editor-background.svg","opacity":0.85,"scrim":0.5}}
+#@ editor {"visualizers":[{"kind":"oscilloscope","opacity":0.8,"position":"bottom"}]}
+```
+
+Open **Editor Background** in Documents for a runnable example. Changes apply
+immediately without evaluating music. `background.kind` accepts `image`,
+`video`, `shader`, or `none`; video takes a served media URL such as
+`"src":"/media/loop.mp4"` and plays muted, inline and looped. Image/video URLs
+can be relative or HTTPS; relative paths resolve against the editor page and
+must be served or packaged, rather than arbitrary local filesystem paths.
+`fit` is `cover` or `contain`; `blur` is 0–32 pixels, `opacity` is 0–1, and
+`scrim` controls darkness behind code (0–1). Shader backgrounds select an
+existing `output` 0–3 and require the browser render host.
+
+Up to four master-output overlays can be selected: `oscilloscope`, `spectrum`,
+`spectrogram`, and `level`, with `position` set to `top`, `bottom`, or `full`.
+They use real final-output samples, RMS and eight FFT bands in both browser and
+native audio, including finite songs; no analyzer units need to be added to the
+music. Older hosts without waveform telemetry show a waiting message for the
+scope. Later comments replace individual top-level settings. Use `visualizers: []`,
+background kind `none`, or remove the comments to clear them. Invalid comments
+and media load failures appear in the Visuals panel. Undo restores settings.
+See [the complete appearance contract](design-docs/specs/design-visual.md#editor-background-comments-2026-10-18).
+
+Browser self-analysis taps, browser MIDI out and per-slot level meters are
+not available on this host. ExternalFile binding persistence is handled
+by the editor.
+
+### Vim mode
+
+- **Turning it on.** Use the `vim` toggle in the transport bar. The setting
+  is saved per browser in `localStorage` (`vactr.vimMode`); the Tauri app
+  keeps its own setting.
+- **Modes.** Normal, insert, replace (`R`), visual (`v`), visual line
+  (`V`) and operator-pending. The status row shows the mode, pending keys,
+  `recording @q` and active search. Cursors are a block in normal and visual,
+  a bar in insert, and an underline in replace and operator-pending.
+- **Keys.** Motions: `h j k l`, `w b e W B E ge`, `0 ^ $`, `gg G {n}G`,
+  `f F t T ; ,`, `%`, `{ }`, `H M L`, `Ctrl-d Ctrl-u Ctrl-f Ctrl-b`,
+  `* #`, `/ ? n N`, arrows, `Home`/`End`, `Backspace` (as `h`) and
+  `Enter` (as `+`). Operators: `d c y > < g~ gu gU`, `dd cc yy >> <<
+  g~~ guu gUU`. Text objects: `iw aw iW aW`, `i" a" i' a'`, `` i` a`
+  ``, `i( a( ib ab i) a)`, `i[ a[ i] a]`, `i{ a{ iB aB i} a}`,
+  `i< a< i> a>`. Also `D C Y x X s S r{c} ~ J p P o O a A i I`, `u`,
+  `Ctrl-r`, `.`, counts, marks (`m{a-z}`, `'{a-z}`, `` `{a-z} ``), and
+  macros (`q{reg}`, `@{reg}`, `@@`). In visual mode, `o` swaps selection
+  ends. Registers: unnamed, `"a-z`, `A-Z`
+  append, `0`, `_`, `+` and `*` system clipboard.
+- **Ex commands.** `:{n}`, `:$`, `:[range]s/pat/rep/[gi]` (including
+  `%` and `'<,'>` ranges), and `:noh`. `:w`, `:q`, `:wq`, `:x` and `:q!`
+  show a message. `:eval`, `:evalall`/`:run`, `:hush` and `:format` run
+  the matching vactr actions.
+- **Live-coding shortcuts.** `Mod-Enter`, `Mod-Shift-Enter`, `Mod-.`
+  (stop), `Mod-Shift-.` (cut) and `Shift-Alt-f` work in every mode. Mod
+  is Cmd on macOS and iPadOS, Ctrl elsewhere. `Ctrl-Space` and completion popup keys work in every mode.
+  When the popup is open, Escape closes it first; Escape then leaves insert
+  mode. `Ctrl-[` is Escape. With the code pane focused outside insert mode,
+  Vim handles the browser's `Ctrl-r`, `Ctrl-f`, `Ctrl-d`, `Ctrl-u` and
+  `Ctrl-b` shortcuts.
+- **IME (Japanese input).** Composition in insert mode works as without
+  Vim. In normal, visual and operator-pending modes, IME input is ignored
+  and does not insert text; the status row reports this. The browser cannot
+  turn off the OS IME, so switch it to direct input for normal-mode
+  commands. Escape during conversion cancels the conversion first. In
+  replace mode, an IME commit inserts rather than overwrites.
+- **Clipboard.** `"+` and `"*` use the browser clipboard API. If
+  unavailable or denied, an internal copy is used and a message is shown.
+- **Touch.** Vim mode is for hardware keyboards. Tap the mode label to
+  enter or leave insert mode with the on-screen keyboard, or use the toggle
+  to turn Vim off.
+- **Keymap.** The `keymap` button in the Vim status row opens a JSON editor
+  with Default and mise-darwin presets. Apply validates entries and applies
+  them live; Import and Export use `.json` files; Reset returns to built-in
+  behavior. The web stores the document in `localStorage` as
+  `vactr.vimKeymap`; Tauri stores `vim-keymap.json` in the app config
+  directory. Without a stored document, Vim behaves as before.
+- **Document format.** Schema version 1 supports `leader`, `timeoutlen`,
+  per-mode `maps` (`n`, `i`, `x`/`v`, `o`, `c`), `lhs`, `rhs` or a named
+  `action`, `remap`, `desc`, and `<Nop>`, plus `hints`, `hop` and documented
+  `unsupported` entries. Actions are `vactr.evaluate`, `vactr.evaluateAll`,
+  `vactr.hush`, `vactr.format`, `vactr.diagnostic.next`,
+  `vactr.diagnostic.prev`, `vactr.completion`, `hop.char1`,
+  `hop.char1Line`, `hop.word` and `hop.line`. For example, an insert map
+  with `lhs: "kj"` and `rhs: "<Esc>"` returns to normal mode. Physical
+  `Ctrl-a`, `Ctrl-z`, `Ctrl-y`, `Ctrl-c`, `Ctrl-x` and `Ctrl-v` are reserved
+  in normal, insert, visual and operator-pending modes; command-line mode
+  reserves `Ctrl-c`, `Ctrl-x` and `Ctrl-v`.
+- **Extra built-ins with a keymap.** `gj` and `gk` are plain line motions
+  (there is no soft wrap); `gJ`, `g;`, `g,`, `zz`, `<C-e>`, `<C-y>`,
+  `ys`, `yss`, `cs` and `ds` are also available. Physical `Ctrl-y` remains
+  redo, so scrolling with `<C-y>` is available only from a mapping rhs.
+- **Hints.** After a configured trigger prefix, a bottom-left panel lists
+  next keys and descriptions (`hints.triggers`, `hints.delayMs`, default
+  200 ms). It does not take focus, and the mapping timeout pauses while
+  the panel is visible.
+- **Hop.** `hop.char1`, `hop.char1Line`, `hop.word` and `hop.line` use
+  labels from `hop.keys`; matching is smartcase. Visual jumps extend the
+  selection, and operator targets work when mapped in `o` mode (they do
+  not repeat with `.`). Setting `hop.enabled` to `false` drops the hop
+  mappings and removes them from the hints: `gj` falls back to the built-in
+  line motion, and `gf` does nothing because vactr has no built-in `gf`.
+- **IME mappings.** Insert-mode mappings do not see IME composition.
+  If a key is pending when composition starts, it is inserted before the
+  composition.
+- **Keymap references.** See the [keymap design](design-docs/specs/design-vim-keymap-hints-hop.md)
+  and [pending keymap questions](design-docs/user-qa/pending-vim-keymap-questions.md).
+- **Not included.** Visual block (`Ctrl-v`), search highlighting, numbered
+  registers and the other items in [the pending Vim questions](design-docs/user-qa/pending-vim-mode-questions.md).
+
+```sh
+# the wasm artifact the editor loads (the --lib build keeps the cdylib at the default path)
+CARGO_TERM_QUIET=true cargo build --lib --target wasm32-unknown-unknown --no-default-features --features host-wasm
+mise run build-wasm-release   # release wasm with the name section (page build default)
+cd editor
+npm ci
+npm run dev        # http://localhost:5173
+npm run check      # tsc
+mise run ts-build-wasm   # tree-sitter-vact.wasm for the syntax tests and dist
+npm run test       # vitest (real-wasm suites read $VACTR_WASM)
+npm run test:perf  # wall-clock budgets, serial; run it alone on the host
+VACTR_REQUIRE_SESSION_ABI=1 npm run build   # editor/dist
+```
+
+`VACTR_WASM` overrides the artifact path. The defaults differ by consumer:
+
+- the vite page build (`npm run dev` and `npm run build`) defaults to
+  `target/wasm32-unknown-unknown/release/vactr.wasm`, built by
+  `mise run build-wasm-release`;
+- the vitest real-wasm suites default to
+  `target/wasm32-unknown-unknown/debug/vactr.wasm`.
+
+Build with `--lib`. Without it, the binary target can overwrite that path
+with a stub that has no `session_init` export. With
+`VACTR_REQUIRE_SESSION_ABI=1`, `npm run build` refuses that stub.
+
+`npm run e2e` runs the Playwright browser evidence harness (Chromium and
+WebKit) with a silent virtual audio sink; see `editor/test/e2e/README.md`
+for the release-wasm, quiet-host and measurement-lock procedure. The
+recorded results are in `design-docs/specs/design-canvas-editor-evidence.md`.
+
+The code pane uses the canvas renderer. The archived DOM comparison results
+are in `design-docs/specs/design-renderer-comparison.md`.
+
+The Tauri shell (`editor/src-tauri/`) is a standalone crate that wraps
+the same `editor/dist`. Its file access is limited to dialog-picked text
+files. `cargo check --manifest-path editor/src-tauri/Cargo.toml` is part
+of verification. `cargo tauri build` and running the app are manual steps.
+
+Pending user confirmation: hearing worklet audio in a real browser, the
+real-browser visual pane, and the Tauri app run.
+
+## Formatting
+
+`vactr fmt [--check] <PATH>...` formats `.vact` files in place; use
+`vactr fmt [--check] -` to format standard input. Exit status 0 means
+success, 1 means an I/O error or a changed file under `--check`, 2 means
+a usage error, and 3 means at least one input had reader errors and was
+left unchanged. Run `mise run fmt-vact-check` to check all tracked `.vact`
+files. A file whose only reader errors are `indent-space` is repaired when
+one inferred indent unit divides every leading-space width and the reread is
+clean; mixed, ambiguous or otherwise erroneous files remain unchanged with
+exit 3.
+
+## Syntax (tree-sitter)
+
+The tree-sitter parser and external scanner are C and can be compiled to
+WASM for browser use; `web-tree-sitter` loads the grammar in the editor.
+See [design-formatter-and-syntax.md, section 2](design-docs/specs/design-formatter-and-syntax.md#2-answer-is-tree-sitter-c-and-does-it-run-as-wasm)
+for the toolchain details. Use `mise run ts-generate` to verify generated
+files, `mise run ts-test` to run the corpus and parse check, and
+`mise run ts-build-wasm` to build `tree-sitter-vact.wasm`. The editor
+parses with tree-sitter in a dedicated Worker (edit deltas in, changed-line
+spans out, stale replies dropped). If the Worker is unavailable it parses
+on the main thread after the next presented frame, and if the tree-sitter
+assets are unavailable it falls back to a line-local tokenizer. The code
+pane's `data-syntax` attribute shows which one is active
+(`tree-sitter-worker`, `tree-sitter` or `fallback`).
+`tree-sitter-vact.wasm` is git-ignored, so run
+`mise run ts-build-wasm` before `npm run test` or `npm run build` on a
+fresh checkout. Tree-sitter spans come from the CodeMirror-free
+`editor/src/code/syntax-core.ts` as `{from, to, class}` with the `vact-tok-*`
+classes, so other renderers can consume them.
+
+## Name
+
+**Vactr** takes its name from an optical component: an LED sealed together
+with a photoresistor, so that light controls resistance. It gives Buchla-style
+low-pass gates their organic decay and lives inside optical compressors
+and tremolos. Light controlling sound is the right picture for a language
+that is half patterns and half visuals. The command is `vactr`; source
+files use the `.vact` extension.
+
+## Development
+
+Tools are managed by mise (`mise install`). Rust is pinned to 1.83.
+
+Usage (see `design-docs/specs/command.md` for flags, exit codes and the
+protocol):
+
+```sh
+vactr repl [--host native|noop]
+vactr run <file.vact> [--host native|noop] [--cycles N]
+vactr serve [<file.vact>] [--host native|noop] [--port P] [--bind 127.0.0.1]
+vactr get [github.com/<owner>/<name>[@vX.Y.Z]] [--store dir:<root>]
+vactr fmt [--check] <PATH>... | -
+vactr lsp [--session <ws-url>]    # needs --features lsp
+```
+
+`--host` defaults to `native`. If the audio device fails to open, the
+CLI warns and falls back to `noop`. `run --host noop --cycles N` uses a
+virtual clock and ends deterministically. `serve` prints its connect
+URL, token included, once to stderr. The package cache lives under
+`$VACTR_HOME/pkg` (default `~/.vactr/pkg`). From a checkout:
+
+```sh
+CARGO_TERM_QUIET=true cargo run --bin vactr -- repl --host noop
+CARGO_TERM_QUIET=true cargo run --features lsp --bin vactr -- lsp
+```
+
+Verification:
+
+```sh
+CARGO_TERM_QUIET=true cargo build
+CARGO_TERM_QUIET=true cargo build --features lsp
+CARGO_TERM_QUIET=true cargo build --target wasm32-unknown-unknown
+CARGO_TERM_QUIET=true cargo build --target wasm32-unknown-unknown --no-default-features --features host-wasm
+CARGO_TERM_QUIET=true cargo clippy --all-targets -- -D warnings
+CARGO_TERM_QUIET=true cargo clippy --all-targets --features lsp -- -D warnings
+CARGO_TERM_QUIET=true cargo fmt --check
+NEXTEST_STATUS_LEVEL=fail NEXTEST_FAILURE_OUTPUT=immediate-final NEXTEST_HIDE_PROGRESS_BAR=1 \
+  CARGO_TERM_QUIET=true cargo nextest run
+CARGO_TERM_QUIET=true cargo test
+CARGO_TERM_QUIET=true cargo test --features lsp --test lsp_smoke
+```
+
+`--workspace` includes the `music-things` crate tests. Without it, cargo
+runs only the vactr package. Do not run `cargo nextest run --workspace`
+while an `lsp`-feature build is running. Both write the shared `vactr`
+binary, and the overlap makes `tests/cli.rs` fail.
+
+The spec fixtures in `tests/fixtures/spec/manifest.toml` pin reader,
+expander, checker and evaluation behavior against the code blocks in
+`lang-reference.md` and `design-music.md`. Each case is classified as
+`positive`, `diagnostic` or `deferred`. No case is deferred now. Blocks
+marked `eval_via = "session"` evaluate as one document through
+`Session`; the rest use a fresh `Evaluator`. To run only the fixtures:
+`cargo nextest run -E 'binary(spec_fixtures)'`. `tests/cli.rs` runs the
+CLI verbs against `NoopHost`. `tests/directive_fixtures.rs` covers the
+`#@` vocabulary. Package tests use only a local directory store, a local
+HTTP fixture and local git repositories, never the public network.
+
+Cargo features:
+
+- `host-native` (the default): cpal audio, midir MIDI, the session socket
+  (tungstenite) and its token (getrandom).
+- `host-wasm`: the browser host ABI.
+- `lsp`: `vactr lsp` (tower-lsp, tokio). It implies `host-native`.
+
+The native-only crates are in the non-wasm32 target table, so both wasm32
+builds stay clean. To build for a Wasm host, run
+`cargo build --target wasm32-unknown-unknown --no-default-features --features host-wasm`.
+
+### Unapplied edit highlights
+
+Edits that have not been successfully evaluated have a translucent yellow background. Play or Update clears successfully applied edits; Evaluate form clears edits within that form. Failed evaluations and newer edits stay highlighted. Undoing a change back to its applied text clears it. Deletions show a marker at their position. Use **Editor → Unapplied edit color** to choose a color, or **Reset color** to restore yellow. The preference is saved locally. Replacements crossing a partial-evaluation boundary remain highlighted until the whole replacement is applied.

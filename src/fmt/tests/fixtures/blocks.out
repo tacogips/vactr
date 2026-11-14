@@ -1,0 +1,5 @@
+inst x:
+	if true:
+		let y 1
+	else:
+		let y 2

@@ -1,0 +1,444 @@
+//! Instrument templates and ugen kernels (design 12.1, 12.2, 12.4).
+//!
+//! An `InstDef` (evaluator side, boxed slices) is first flattened into a
+//! fixed-capacity `RawGraph` (natively with `RawGraph::load`, in the
+//! browser by decoding install bytes, `arena::decode_graph`), then compiled
+//! into a `Template`: nodes in topological order with every input port
+//! resolved to a source, the template's control list, per-node delay
+//! memory offsets inside a voice's region, and the resources it reads.
+//! `Template::build` never allocates, so the worklet can compile into a
+//! preallocated template slot.
+//!
+//! The kernels (`osc`, `filter`, `env`, `fm`, `additive`, `wavetable`,
+//! `sample`, and `granular`) render one node for one block into its output
+//! buffer; `voice.rs` walks a template in order. Effect nodes run a voice
+//! `FxUnit` (`voice.rs`).
+
+mod build_helpers;
+use build_helpers::{mem_need, topo_order};
+
+pub use music_things_synth::additive;
+pub mod analog_pair;
+pub use music_things_synth::analog_percussion;
+pub use music_things_synth::bass_voice;
+pub use music_things_synth::braids_cloud;
+pub use music_things_synth::braids_digital;
+pub use music_things_synth::braids_filter;
+pub use music_things_synth::braids_five;
+pub use music_things_synth::braids_fm;
+pub use music_things_synth::braids_formant;
+pub use music_things_synth::braids_noise;
+pub use music_things_synth::braids_percussion;
+pub use music_things_synth::braids_physical;
+pub use music_things_synth::braids_struck;
+pub use music_things_synth::braids_subsync;
+pub use music_things_synth::braids_triple;
+pub use music_things_synth::braids_wave_bank;
+pub use music_things_synth::braids_wave_line;
+pub mod catalog;
+pub use music_things_synth::chip_pair;
+pub mod chord_pair;
+pub use music_things_synth::clock_noise_pair;
+pub mod digital_drum;
+pub mod dual_kick;
+pub use music_things_synth::elements_internal;
+pub use music_things_synth::env;
+pub use music_things_synth::feedback_metal;
+pub use music_things_synth::filter;
+pub use music_things_synth::fm;
+pub use music_things_synth::fm_drum;
+pub mod fm_pair;
+pub use music_things_synth::frame_keyframe;
+pub use music_things_synth::frame_lfo;
+pub use music_things_synth::fusion_drum;
+pub use music_things_synth::gendyn;
+pub use music_things_synth::grain_pair;
+pub mod hat_pair;
+pub use music_things_synth::hurdy_gurdy;
+pub use music_things_synth::kalimba;
+pub mod mixer;
+pub use music_things_synth::modal_pair;
+pub use music_things_synth::musicdsp_synth;
+pub use music_things_synth::number_station;
+pub use music_things_synth::osc;
+pub use music_things_synth::particle_pair;
+pub use music_things_synth::peak_function;
+pub use music_things_synth::peak_pulse;
+pub use music_things_synth::phase_pair;
+pub use music_things_synth::rings_part;
+pub mod sample;
+pub use music_things_synth::scanned;
+pub mod shape_pair;
+pub use music_things_synth::six_op_original;
+pub mod snare_pair;
+pub use music_things_synth::spectrum_pair;
+pub use music_things_synth::speech_original;
+pub mod stage_chain;
+pub use music_things_synth::stage_linked;
+pub use music_things_synth::stage_segment;
+pub use music_things_synth::string_choir;
+pub mod string_machine_pair;
+pub use music_things_synth::string_pair;
+pub use music_things_synth::swarm_pair;
+pub mod table_terrain_pair;
+pub mod terrain_pair;
+pub use music_things_synth::tidal_function;
+pub use music_things_synth::tidal_poly;
+pub use music_things_synth::tonewheel;
+pub mod va_filter;
+pub mod vactrol_gate;
+pub mod voice_layer;
+pub use music_things_synth::vosim;
+pub mod wavetable;
+
+use crate::dsp::arena::SampleStore;
+use crate::dsp::caps::CapabilitySet;
+use crate::dsp::cells::CellId;
+use crate::dsp::controls;
+use crate::dsp::effects::{self, FxStats, MAX_FX_PARAMS};
+use crate::dsp::graph::{
+    BankRef, EffectKind, GranSrc, InstDef, InstId, NodeAudioShape, TableRef, UGenSpec, DISCARD,
+    MAX_OUTPUTS_PER_NODE, NODE_CAP,
+};
+use crate::host::wire::Ctl;
+use crate::sched::slots::CtlId;
+
+pub use catalog::MAX_PORTS;
+
+/// The most distinct controls one template reads.
+pub const MAX_PARAMS: usize = 48;
+/// The most edges one template has.
+pub const MAX_EDGES: usize = 1024;
+/// The most node parameters one template has (effect parameters included).
+pub const MAX_NODE_PARAMS: usize = 1024;
+/// The most effect nodes one instrument template has (per-voice units).
+pub const MAX_VOICE_FX: usize = 4;
+/// The most resources (samples, tables) one template references.
+pub const MAX_REFS: usize = 8;
+/// The most output (sink) nodes, summed.
+pub const MAX_SINKS: usize = 8;
+
+/// The amplitude control (`amp`, and `gain` by Q4).
+pub const AMP: CtlId = CtlId::new(1);
+/// The pan control.
+pub const PAN: CtlId = CtlId::new(4);
+/// The bank control: the installed resource id a sample event plays.
+pub const BANK: CtlId = CtlId::new(24);
+
+/// Sentinel slot for an `fm6-core` instance that uses macro mode.
+pub const NO_FM6_PATCH: u8 = u8::MAX;
+
+/// A node kind: the POD mirror of `UGenSpec` (effect parameters move to
+/// the graph's node parameters).
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub enum Node {
+    SinOsc,
+    Saw,
+    Pulse,
+    Tri,
+    WhiteNoise,
+    HostInputL,
+    HostInputR,
+    Lpf,
+    Hpf,
+    Bpf,
+    Delay,
+    Comb,
+    EnvPerc,
+    EnvAdsr,
+    Line,
+    SamplePlay(BankRef),
+    Mul,
+    Add,
+    Const(f32),
+    Param(CtlId),
+    Vco {
+        unison_max: u8,
+    },
+    SubOsc,
+    Ladder,
+    Svf,
+    FmOp,
+    FmMod,
+    FmDrum,
+    FeedbackMetal,
+    DigitalDrumCore,
+    DigitalSnareCore,
+    DigitalMetalCore,
+    DigitalHatCore,
+    AnalogPercussion,
+    VaSource,
+    VaFilter,
+    PhasePair,
+    FmPair,
+    SixOpOriginal,
+    SpeechOriginal,
+    RingsPart,
+    StringChoir,
+    ElementsInternal,
+    TidalFunction,
+    TidalPoly,
+    PeakFunction,
+    StageSegment,
+    StageChain,
+    StageLinked {
+        slot: u8,
+    },
+    FrameLfo,
+    FrameKeyframe {
+        slot: u8,
+    },
+    PeakPulse,
+    NumberStation,
+    SpectrumPair,
+    ClockNoisePair,
+    DualKick,
+    SnarePair,
+    HatPair,
+    SwarmPair,
+    ParticlePair,
+    ModalPair,
+    StringPair,
+    ChipPair,
+    AnalogPair,
+    GrainPair,
+    ShapePair,
+    VactrolGate,
+    DecayMod,
+    StringMachinePair,
+    TerrainPair,
+    TableTerrainPair,
+    ChordPair,
+    BraidsFive,
+    BraidsSubSync,
+    BraidsTriple,
+    BraidsDigital,
+    BraidsFilter,
+    BraidsFormant,
+    BraidsFm,
+    BraidsPhysical,
+    BraidsStruck,
+    BraidsPercussion,
+    BraidsWaveBank,
+    BraidsWaveLine,
+    BraidsNoise,
+    BraidsCloud,
+    AuxOut,
+    Out3,
+    Out4,
+    FeedbackDrum,
+    NoiseDrum,
+    SineDrum,
+    DsfOsc,
+    ChebyshevOsc,
+    GaussianNoise,
+    LorenzOsc,
+    RosslerOsc,
+    AmFormantOsc,
+    PhaseDistortion,
+    Additive {
+        partials_max: u8,
+    },
+    Wavetable(TableRef),
+    Granular(GranSrc),
+    /// An effect as a ugen; `fx` is its per-voice unit index.
+    Effect {
+        kind: EffectKind,
+        fx: u8,
+    },
+    /// Self-enveloped bass voice kernel (six prelude models).
+    BassCore,
+    /// kalimba voice kernel.
+    KalimbaCore,
+    /// tonewheel voice kernel.
+    TonewheelCore,
+    /// hurdy gurdy voice kernel.
+    HurdyGurdyCore,
+    /// vosim voice kernel.
+    VosimCore,
+    /// gendyn voice kernel.
+    GendynCore,
+    /// scanned voice kernel.
+    ScannedCore,
+    /// Six-operator FM core; slot indexes the optional constant patch table.
+    Fm6Core {
+        slot: u8,
+    },
+}
+
+pub use mixer::run;
+
+impl Node {
+    /// The node of a spec (an effect's parameters are not included).
+    #[must_use]
+    pub fn from_spec(spec: &UGenSpec) -> Node {
+        catalog::node_of(spec)
+    }
+
+    /// True for the envelope nodes that decide when a voice ends.
+    #[must_use]
+    pub const fn is_env(&self) -> bool {
+        matches!(
+            self,
+            Node::EnvPerc
+                | Node::EnvAdsr
+                | Node::FmDrum
+                | Node::FeedbackMetal
+                | Node::DigitalDrumCore
+                | Node::DigitalSnareCore
+                | Node::DigitalMetalCore
+                | Node::DigitalHatCore
+                | Node::BassCore
+                | Node::KalimbaCore
+                | Node::TonewheelCore
+                | Node::HurdyGurdyCore
+                | Node::Fm6Core { .. }
+                | Node::AnalogPercussion
+                | Node::DualKick
+                | Node::SnarePair
+                | Node::HatPair
+                | Node::SwarmPair
+                | Node::ParticlePair
+                | Node::ModalPair
+                | Node::StringPair
+                | Node::ChipPair
+                | Node::AnalogPair
+                | Node::GrainPair
+                | Node::ShapePair
+                | Node::StringMachinePair
+                | Node::TerrainPair
+                | Node::TableTerrainPair
+                | Node::ChordPair
+                | Node::BraidsFive
+                | Node::BraidsSubSync
+                | Node::BraidsTriple
+                | Node::BraidsDigital
+                | Node::BraidsFilter
+                | Node::BraidsFormant
+                | Node::BraidsFm
+                | Node::BraidsPhysical
+                | Node::BraidsStruck
+                | Node::BraidsPercussion
+                | Node::BraidsWaveBank
+                | Node::BraidsWaveLine
+                | Node::BraidsNoise
+                | Node::BraidsCloud
+                | Node::FeedbackDrum
+                | Node::NoiseDrum
+                | Node::SineDrum
+        )
+    }
+}
+
+/// Where one input port reads from.
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub enum Src {
+    /// Nothing feeds the port: its constant default.
+    Default(f32),
+    /// A selected output slice of an earlier node.
+    Node {
+        slice: u16,
+        stereo: bool,
+    },
+    Const(f32),
+    /// The voice's value of template control `k` (`Template::params`).
+    Param(u8),
+    /// A template-level cell, re-read every block (control rate).
+    Cell(CellId),
+}
+
+/// One compiled node.
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub struct NodeSpec {
+    pub node: Node,
+    pub inputs: [Src; MAX_PORTS],
+    /// First channel slice for each output, or the shared discard slice.
+    pub outs: [u16; MAX_OUTPUTS_PER_NODE],
+    /// Declared output shapes, resolved at template build time.
+    pub shape: NodeAudioShape,
+    /// Delay memory inside the voice region.
+    pub mem_off: u32,
+    pub mem_len: u32,
+}
+
+impl NodeSpec {
+    const EMPTY: NodeSpec = NodeSpec {
+        node: Node::Const(0.0),
+        inputs: [Src::Default(0.0); MAX_PORTS],
+        outs: [DISCARD; MAX_OUTPUTS_PER_NODE],
+        shape: NodeAudioShape::MONO,
+        mem_off: 0,
+        mem_len: 0,
+    };
+}
+
+pub use music_things_synth::{Inp, NodeState};
+
+/// What a kernel may read besides its inputs.
+pub struct Kx<'a> {
+    pub sr: f32,
+    /// Frames of this block during which the gate is open (0 = closed).
+    pub gate: usize,
+    /// The event's `bank` control (the resource a sample event plays).
+    pub bank: Option<u32>,
+    pub store: &'a SampleStore,
+    pub caps: &'a CapabilitySet,
+    pub stats: &'a mut FxStats,
+    /// The voice's seed for noise and grain randomness.
+    pub seed: u32,
+}
+
+impl music_things_synth::KernelContext for Kx<'_> {
+    fn kernel_ctx(&self) -> music_things_synth::KernelCtx {
+        music_things_synth::KernelCtx {
+            sr: self.sr,
+            gate: self.gate,
+            seed: self.seed,
+        }
+    }
+}
+
+/// Why a graph cannot be compiled (reported as `graph-too-large` or an
+/// install failure by the caller).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum BuildError {
+    TooManyNodes,
+    TooManyEdges,
+    TooManyParams,
+    TooManyEffects,
+    TooManyBuffers,
+    BadEdge,
+    Cycle,
+    Empty,
+    BadFrameData,
+    BadStageData,
+    BadFm6Patch,
+    /// The per-voice memory cannot hold the template's fixed state.
+    MemExceeded,
+}
+
+impl BuildError {
+    /// A one-line reason.
+    #[must_use]
+    pub const fn message(self) -> &'static str {
+        match self {
+            BuildError::TooManyNodes => "more than 256 nodes",
+            BuildError::TooManyEdges => "too many connections",
+            BuildError::TooManyParams => "too many controls or parameters",
+            BuildError::TooManyEffects => "more than 4 effects in one instrument",
+            BuildError::TooManyBuffers => {
+                "the instrument needs more than 512 audio channel buffers"
+            }
+            BuildError::BadEdge => "a connection names a missing node or port",
+            BuildError::Cycle => "the graph has a cycle",
+            BuildError::Empty => "the graph has no nodes",
+            BuildError::BadFrameData => "invalid keyframe data",
+            BuildError::BadStageData => "invalid Stages segment data",
+            BuildError::BadFm6Patch => "invalid six-operator patch",
+            BuildError::MemExceeded => "the instrument state exceeds the voice memory",
+        }
+    }
+}
+
+mod template;
+pub use template::{BuildEnv, RawGraph, Template};

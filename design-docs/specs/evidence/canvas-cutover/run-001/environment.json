@@ -1,0 +1,47 @@
+{
+  "hostname": "tacogipsnoMacBook-Air.local",
+  "platform": "darwin",
+  "release": "25.5.0",
+  "arch": "arm64",
+  "node": "v26.10.0",
+  "runId": "run-001",
+  "commands": [
+    "cd editor && npm run e2e -- --browser all --profile all --run-id run-001 --write-evidence",
+    "mise run build-wasm-release",
+    "cd editor && VACTR_REQUIRE_SESSION_ABI=1 npm run build"
+  ],
+  "wasm": {
+    "path": "/Users/taco/gits/tacogips/vactr-worktrees/wf-canvas/editor/dist/vactr.wasm",
+    "bytes": 6451822,
+    "sha256": "fda9d3bac38b8f47b45d00d2dd890b844398e7899b10ee024aa48a213aaf870f",
+    "nameSection": true,
+    "dwarf": false,
+    "profile": "release",
+    "releasePath": "/Users/taco/gits/tacogips/vactr-worktrees/wf-canvas/target/wasm32-unknown-unknown/release/vactr.wasm",
+    "releaseSha256": "fda9d3bac38b8f47b45d00d2dd890b844398e7899b10ee024aa48a213aaf870f",
+    "debugSha256": "502fad8958b149088258dd331538414716461f01abca435daef2d8f16631e9f4",
+    "gating": true
+  },
+  "chromium": {
+    "version": "151.0.7922.34",
+    "headless": true
+  },
+  "webkit": {
+    "version": "26.5",
+    "headless": true
+  },
+  "osVersion": "Darwin Kernel Version 25.5.0: Tue Jun  9 22:26:22 PDT 2026; root:xnu-12377.121.10~1/RELEASE_ARM64_T8132",
+  "webgl": {
+    "chromium": {
+      "webgl2": true,
+      "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4, Unspecified Version)"
+    },
+    "webkit": {
+      "webgl2": true,
+      "renderer": "Apple GPU"
+    }
+  },
+  "simulator": {
+    "xcode": "/Applications/Xcode.app/Contents/Developer"
+  }
+}

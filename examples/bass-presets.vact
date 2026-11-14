@@ -1,0 +1,78 @@
+# Bass patch library for techno at 125-140 BPM.
+#
+# Call a patch with a note pattern, then route its returned sound pattern:
+#   acid-squelch [:c2 :c2 :eb2 :c3] > accent [0 1 0 0] > cut 1 > d1
+# `slide-from` is a semitone offset from the previous note; use it with cut 1.
+# `gate-length` is in sixteenth-steps of the current tempo cycle.
+# Wobble `lfo-rate` divisions: quarter=4, eighth=8, quarter-triplet=6,
+# eighth-triplet=12. Use `lfo-sync false` with a free rate in Hz.
+
+use-bpm 132
+
+# Analog-modeling basses
+fn analog-pluck notes:
+	s :analog-bass > note notes > wave :saw > cutoff 380 > res 0.28 > env-mod 3 > env-decay 0.12 > sub-level 0.4 > drive 0.2 > gate-length 0.75 > amp-decay 0.28 > sustain 0.7 > gain 0.7
+
+fn analog-driven notes:
+	s :analog-bass > note notes > wave :saw > cutoff 260 > res 0.42 > env-mod 2.2 > env-decay 0.2 > sub-level 0.5 > drive 0.62 > gate-length 0.9 > amp-decay 0.4 > sustain 0.8 > gain 0.52
+
+fn analog-square notes:
+	s :analog-bass > note notes > wave :square > cutoff 520 > res 0.22 > env-mod 1.5 > env-decay 0.32 > sub-level 0.18 > drive 0.12 > gate-length 1.2 > amp-decay 0.5 > sustain 0.75 > gain 0.62
+
+# Acid basses
+fn acid-squelch notes:
+	s :acid-bass > note notes > wave :saw > cutoff 280 > res 0.82 > env-mod 4.2 > env-decay 0.16 > drive 0.42 > gate-length 0.48 > accent 0.2 > gain 0.52
+
+fn acid-rolling notes:
+	s :acid-bass > note notes > wave :saw > cutoff 360 > res 0.74 > env-mod 3.4 > env-decay 0.11 > drive 0.34 > gate-length 0.42 > accent 0.15 > gain 0.55
+
+fn acid-deep notes:
+	s :acid-bass > note notes > wave :square > cutoff 190 > res 0.68 > env-mod 2.6 > env-decay 0.28 > drive 0.28 > gate-length 1.1 > accent 0 > gain 0.58
+
+# FM and digital basses
+fn fm-pluck notes:
+	s :fm-bass > note notes > ratio 2 > index 5 > fm-feedback 0.18 > cutoff 2200 > env-mod 0.8 > env-decay 0.08 > amp-decay 0.22 > sustain 0.3 > gate-length 0.7 > gain 0.45
+
+fn fm-digital-grit notes:
+	s :fm-bass > note notes > ratio 1.5 > index 8 > fm-feedback 0.42 > fold 0.6 > bit-depth 6 > cutoff 1400 > env-mod 0.6 > env-decay 0.12 > drive 0.18 > gate-length 0.8 > gain 0.32
+
+fn fm-metal notes:
+	s :fm-bass > note notes > ratio 2 > index 10 > fm-feedback 0.78 > fold 0.18 > bit-depth 12 > cutoff 1800 > env-mod 0.5 > env-decay 0.1 > gate-length 0.65 > gain 0.28
+
+# Tempo-synced and free wobble basses
+fn wobble-quarter notes:
+	s :wobble-bass > note notes > wave :saw > detune 0.1 > sub-level 0.45 > cutoff 150 > res 0.52 > drive 0.36 > lfo-wave :sine > lfo-rate 4 > lfo-depth 0.9 > lfo-sync true > gate-length 4 > gain 0.42
+
+fn wobble-eighth notes:
+	s :wobble-bass > note notes > wave :saw > detune 0.16 > sub-level 0.35 > cutoff 190 > res 0.46 > drive 0.4 > lfo-wave :saw > lfo-rate 8 > lfo-depth 0.82 > lfo-sync true > gate-length 4 > gain 0.38
+
+fn wobble-triplet notes:
+	s :wobble-bass > note notes > wave :square > detune 0.08 > sub-level 0.48 > cutoff 125 > res 0.58 > drive 0.32 > lfo-wave :tri > lfo-rate 6 > lfo-depth 0.95 > lfo-sync true > gate-length 4 > gain 0.4
+
+fn wobble-free notes:
+	s :wobble-bass > note notes > wave :saw > detune 0.2 > sub-level 0.3 > cutoff 170 > res 0.5 > drive 0.38 > lfo-wave :sine > lfo-rate 3.2 > lfo-depth 0.85 > lfo-sync false > gate-length 4 > gain 0.38
+
+# Sub basses
+fn sub-deep notes:
+	s :sub-bass > note notes > wave :sine > cutoff 180 > res 0 > drive 0.12 > click-level 0.04 > gate-length 1.5 > amp-attack 0.003 > release 0.08 > gain 0.66
+
+fn sub-driven notes:
+	s :sub-bass > note notes > wave :tri > cutoff 210 > res 0.04 > drive 0.48 > click-level 0.08 > gate-length 1.1 > amp-attack 0.002 > release 0.06 > gain 0.52
+
+fn sub-long notes:
+	s :sub-bass > note notes > wave :sine > cutoff 145 > res 0 > drive 0.08 > click-level 0 > gate-length 3 > amp-attack 0.01 > release 0.18 > gain 0.7
+
+# Reese basses
+fn reese-hoover notes:
+	s :reese-bass > note notes > wave :saw > detune 0.32 > sub-level 0.3 > cutoff 520 > res 0.22 > env-mod 1.2 > env-decay 0.5 > drive 0.42 > gate-length 3 > amp-attack 0.006 > release 0.12 > gain 0.4
+
+fn reese-dark notes:
+	s :reese-bass > note notes > wave :saw > detune 0.22 > sub-level 0.42 > cutoff 330 > res 0.18 > env-mod 0.75 > env-decay 0.8 > drive 0.3 > gate-length 3.5 > amp-attack 0.012 > release 0.15 > gain 0.48
+
+fn reese-rumble notes:
+	s :reese-bass > note notes > wave :square > detune 0.28 > sub-level 0.5 > cutoff 240 > res 0.12 > env-mod 0.5 > env-decay 0.9 > drive 0.55 > gate-length 4 > amp-attack 0.01 > release 0.2 > gain 0.34
+
+# Try these calls with cut 1 for acid slides:
+# acid-squelch [:c2 :c2 :eb2 :c3] > accent [0 1 0 0] > slide-from [0 0 -3 7] > cut 1 > d1
+# sub-deep [:c1 nil :c1 :g0] > d1
+# wobble-eighth [:c1 :g0] > d1

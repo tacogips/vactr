@@ -1,0 +1,15 @@
+# Opt-in immutable 1–36 segment chain adaptation. Each row is
+# [type loop primary secondary]: type 0 ramp, 1 step, 2 hold, 3 oscillator.
+# Load this file explicitly. The list is fixed for each installed template;
+# gate/trigger/frequency/amp remain event controls. Main is value, aux phase.
+
+inst stage-linked-voice segments: [float] = [0 0 0.15 0.5 2 1 0.85 0.25 0 0 0.3 0.5] chain-gate: float = 1 chain-trigger: float = 0:
+	stage-linked-core freq segments: segments chain-gate: chain-gate chain-trigger: chain-trigger chain-channel: 0 > * amp
+		> + {stage-linked-core freq segments: segments chain-gate: chain-gate chain-trigger: chain-trigger chain-channel: 1 > * amp > aux-out}
+
+# Director row then 4 STEP rows: secondary 0..1 of row 0 selects seven
+# traversal modes. `step-clock` supplies event-local gate edges; main is
+# slewed step value, aux is bounded step position. Trigger resets the event.
+inst stage-sequencer-voice segments: [float] = [0 0 0 0.07 1 0 0.1 0 1 1 0.8 0.2 1 1 0.3 0.7 1 0 0.9 0.1] step-clock: float = 8 chain-gate: float = 1 chain-trigger: float = 0:
+	stage-linked-core freq segments: segments chain-gate: {pulse step-clock 0.3 > * chain-gate} chain-trigger: chain-trigger chain-channel: 0 > * amp
+		> + {stage-linked-core freq segments: segments chain-gate: {pulse step-clock 0.3 > * chain-gate} chain-trigger: chain-trigger chain-channel: 1 > * amp > aux-out}

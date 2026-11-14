@@ -1,0 +1,1735 @@
+# Spec fixture manifest (design 6.5.6). Parsed by tests/support/toml_subset.rs.
+# [[block]]: one entry per `vactr`/`vact` fence, found by ordinal per document;
+#   reader_diags is the exact multiset of reader codes, `code@line` with the line
+#   counted within the block. `expand_diags` is the exact multiset of expander codes,
+#   `code@line`; forms with a reader error are skipped (the runner asserts that they
+#   return read-error-present) and are not listed. `eval` is the 7.1.7 class:
+#   positive and diagnostic blocks pin `check_diags` (errors and warnings of checking
+#   the block as one document, `code@line`) and `run_fails` (failing forms,
+#   `code@first line`, one fresh Evaluator); deferred blocks name `deferred_to` and
+#   pin `check_diags` when `pin_check`; `eval_via = "session"` runs a block
+#   through `vactr::session::Session` instead (package loading; check_diags
+#   are then the session's reported codes); `blocked_by` + `defect_run_fails` mark
+#   failures caused only by a recorded implementation defect (asserted to reproduce
+#   exactly, so the repair must update them).
+# [[case]]: `read` and `expand` are canonical prints (src/reader/sexpr.rs) joined by
+#   newlines; `diags` is the multiset of reader codes plus expander codes (a case with
+#   an expander diagnostic has no `expand`); `verbatim = true` means `source` appears
+#   verbatim in `doc`.
+
+[[block]]
+doc = "lang-reference.md"
+ordinal = 1
+section = 0
+reader = "clean"
+reader_diags = []
+expand = "clean"
+expand_diags = []
+eval = "positive"
+check_diags = []
+run_fails = []
+note = "Principles: the two spellings of 43+32 times 12. Eval: Positive: both forms check clean and run (`print` stages one console line)."
+
+[[block]]
+doc = "lang-reference.md"
+ordinal = 2
+section = 1
+reader = "clean"
+reader_diags = []
+expand = "clean"
+expand_diags = []
+eval = "diagnostic"
+check_diags = ["rebinding@27", "rebinding@28", "rebinding@68", "rebinding@80", "shadowing@72", "shadowing@93", "undefined-name@50", "upd-immutable@25"]
+run_fails = ["undefined-name@50", "upd-immutable@25"]
+note = "Basics: fn, bindings, lambdas, pipes and continuation lines. Eval: Read as ONE document (7.1.7): the annotated negatives `upd a 13` (upd-immutable@25, also at run time), `let a 13` and `var hits 5` (rebinding@27, @28); the later `let a 12` (@68) and `let arr [..]` (@80) re-bind names the block already bound (the prose means live re-evaluation, which `eval_form` treats as redefinition); the `fn fn1 a b` and `fn some-fn a` parameters shadow the session `a` (shadowing@72, @93, warnings); `my-kick` (@50) is an unbound placeholder."
+
+[[block]]
+doc = "lang-reference.md"
+ordinal = 3
+section = 2
+reader = "clean"
+reader_diags = []
+expand = "clean"
+expand_diags = []
+eval = "diagnostic"
+check_diags = ["duplicate-key@192", "literal-division-by-zero@278", "shadowing@244", "shadowing@245", "type-mismatch@279", "type-mismatch@57", "type-mismatch@7", "type-mismatch@8", "undefined-name@10", "undefined-name@107", "undefined-name@108", "undefined-name@109", "undefined-name@137", "undefined-name@138", "undefined-name@141", "undefined-name@211", "undefined-name@275", "undefined-name@309", "undefined-name@310", "undefined-name@310", "undefined-name@65", "undefined-name@80", "undefined-name@81", "undefined-name@87", "unknown-keyword@241"]
+run_fails = ["division-by-zero@278", "not-callable@57", "not-callable@60", "not-callable@7", "not-callable@8", "type@279", "undefined-name@10", "undefined-name@107", "undefined-name@108", "undefined-name@109", "undefined-name@137", "undefined-name@138", "undefined-name@141", "undefined-name@211", "undefined-name@275", "undefined-name@309", "undefined-name@310", "undefined-name@65", "undefined-name@80", "undefined-name@81", "undefined-name@87", "unknown-field@241"]
+note = "Literals and data: numbers, strings, keywords, nil, identifiers, blocks, pairs, dicts, structs, errors, ranges, and the unquoted path and url literals (6.5.8). Eval: An illustrative block: literal listings on one line are calls (`1  -3`, `2.5  0.25`, `:kick ..`: type-mismatch and not-callable; `nil  true  false`: not-callable at run time); free example names (`pat`, `d` before its `let`, `x`, `fn1`, `a`, `arr`, `other`, `parse`: undefined-name); the annotated negatives `[amp: 1 amp: 2]` (duplicate-key, a warning), `v :nope` (unknown-keyword; unknown-field at run time), `/ 1 0` and `+ 1 \"a\"`; `voice [note: p]` and `voice [amp: a pan: p]` bind `p` over the session `let p` (shadowing, warnings)."
+
+[[block]]
+doc = "lang-reference.md"
+ordinal = 4
+section = 3
+reader = "clean"
+reader_diags = []
+expand = "clean"
+expand_diags = []
+eval = "diagnostic"
+check_diags = ["rebinding@51", "shadowing@153", "shadowing@89", "shadowing@89", "shadowing@91", "shadowing@92", "shadowing@92", "unbounded-source@219", "undefined-name@10", "undefined-name@101", "undefined-name@188", "undefined-name@189", "undefined-name@190", "undefined-name@191", "undefined-name@192", "undefined-name@193", "undefined-name@196", "undefined-name@201", "undefined-name@205", "undefined-name@207", "undefined-name@24", "undefined-name@25", "undefined-name@33", "undefined-name@33", "undefined-name@50", "undefined-name@51", "undefined-name@6", "undefined-name@74", "undefined-name@81", "undefined-name@84"]
+run_fails = ["fuel-exhausted@219", "undefined-name@10", "undefined-name@101", "undefined-name@188", "undefined-name@189", "undefined-name@190", "undefined-name@191", "undefined-name@192", "undefined-name@193", "undefined-name@196", "undefined-name@201", "undefined-name@205", "undefined-name@207", "undefined-name@24", "undefined-name@25", "undefined-name@33", "undefined-name@50", "undefined-name@51", "undefined-name@56", "undefined-name@6", "undefined-name@64", "undefined-name@65", "undefined-name@74", "undefined-name@81", "undefined-name@84"]
+note = "Control flow: if/elif/else chains, binding if, match, enum, iteration. Eval: An illustrative block: free example names (`a`, `d`, `s`, `x`, `msg`, `arr`, `pairs`, `parse`: undefined-name, also at run time where the binding they feed failed); `let [amp: a pan: p] d` re-binds `a` (rebinding@51); match-clause and pattern names shadow session names (shadowing, warnings); `for x 0..:` is unbounded-source (a warning) and fuel-exhausted at run time. Line 157 `circle 5 > area > print` runs clean: the match name `r` binds although the session `r` holds a variant value (repair R2, attempt-2)."
+
+[[block]]
+doc = "lang-reference.md"
+ordinal = 5
+section = 4
+reader = "diagnostics"
+reader_diags = ["stray-char@100"]
+expand = "clean"
+expand_diags = []
+eval = "diagnostic"
+eval_via = "session"
+check_diags = ["package-not-locked@55", "package-not-locked@56", "package-not-locked@57", "read-error-present@99", "stray-char@100", "undefined-name@58", "undefined-name@81", "unknown-keyword@23", "upd-immutable@33"]
+run_fails = ["arity@14", "arity@14", "host-unavailable@80", "undefined-name@58", "undefined-name@81", "unknown-sound@23", "upd-immutable@33"]
+note = "State and modules. The `...` placeholder body of `fn pluck ...` (block line 100) is `..` plus a stray `.`; it is not a path, since its third character is not `/` (6.5.8). Eval (SS-FINAL, TASK-009): Needs package loading, so the block runs as ONE document through `vactr::session::Session` (`eval_via = \"session\"`: NoopHost hosts, native caps, no `vactr.lock`, no package cache). check_diags are the session's reported errors and warnings (reader, expander, checker, load, package); run_fails are failing forms at their first line plus drain faults at their site. The three `import github.com/someone/vactr-pads` forms are package-not-locked@55-57 (a running session never fetches, 14.5.7), so `pads.warm` stays undefined-name@58; `load ./soundpack/..` is host-unavailable@80 under NoopHost, so `my-pack` is unbound at @81 (undefined-name, check and run); `fn pluck` with its stray-char@100 body is read-error-present@99 (the session reports reader and expander codes with the checker's); `:not-a-sample` is the annotated unknown-keyword@23 and the dropped event's unknown-sound@23 fault (the slot keeps playing); `upd base 62` of `let base 60` is upd-immutable@33 (the example upd's a `let`, which the Decided rule forbids: a spec text erratum). The second `fn kick-sound` is live redefinition in a session (no rebinding). The runtime calls a fn-valued pattern parameter with the event time (a param may be a fn of time), so the zero-parameter `fn kick-sound:` of line 12/15 faults arity@14 on each dry run (bind and the redefinition's re-evaluation): recorded for the language author, not changed here."
+
+[[block]]
+doc = "lang-reference.md"
+ordinal = 6
+section = 6
+reader = "clean"
+reader_diags = []
+expand = "clean"
+expand_diags = []
+eval = "positive"
+check_diags = []
+run_fails = []
+note = "Tuning and chord performance: `tune {edo 19}` with the `:edo19-major` scale preset, and a `:ji-5` chord voiced and strummed down over 1/32. Eval: Positive: both forms check clean and run (serial reconcile, session-354)."
+
+[[block]]
+doc = "lang-reference.md"
+ordinal = 7
+section = 6
+reader = "clean"
+reader_diags = []
+expand = "clean"
+expand_diags = []
+eval = "positive"
+check_diags = []
+run_fails = []
+note = "Tuning and chord performance: a patterned tuning `{alt {edo 19} {edo 31}}` under `perform` in `:strum` mode, and `harp` over a 12-strip plate driven by `{range sine 0 1}`. Eval: Positive: both forms check clean and run (serial reconcile, session-354)."
+
+[[block]]
+doc = "design-music.md"
+ordinal = 1
+section = 1
+reader = "clean"
+reader_diags = []
+expand = "clean"
+expand_diags = []
+eval = "diagnostic"
+check_diags = ["clock-source-unavailable@49"]
+run_fails = []
+note = "Time: pipes into slots, the every/whenmod continuation chain, once/at, live vars. Eval: Every form runs: tempo, SOUND FIRST chains, every/whenmod, alt, once/at, a live `var` with `upd`, MIDI clock and input (`cc`, `midi-notes` after `s`), `s {midi 1}`, stop/hush. The one check error is `use-clock :link` (clock-source-unavailable@49: Ableton Link is marked planned)."
+
+[[block]]
+doc = "design-music.md"
+ordinal = 2
+section = 2
+reader = "clean"
+reader_diags = []
+expand = "clean"
+expand_diags = []
+eval = "diagnostic"
+check_diags = ["rebinding@32", "type-mismatch@96", "type-mismatch@97", "type-mismatch@102", "undefined-name@36"]
+run_fails = ["arity@102", "host-unavailable@30", "host-unavailable@98", "host-unavailable@99", "host-unavailable@100", "host-unavailable@101", "not-callable@97", "type@107", "type@96", "undefined-name@31", "undefined-name@36"]
+note = "Sound. The chord line writes `[:g :dom7]` (Decided 2026-09-25: letter-first chord qualities, never `:7`), so the block reads clean; its `./x` paths lex as path literals (6.5.8). Eval (BE-FINAL, TASK-008, fixture NoopHost): `inst pluck` realizes to an instrument and `s :pluck > .. > cutoff {..}` runs (`cutoff` is its header parameter used as a pattern control, M3; serial repair R1 made the VM agree with the checker). `load ./soundpack/..` is host file I/O (host-unavailable@30 under NoopHost), so `my-pack` is unbound on line 31 (undefined-name@31). The two alternative `let sound-kit` overrides are rebinding@32 as one document (question M6, deferred); at run time the line-32 override merges its dict element (repair R1, attempt-2). `tr909` is unbound (undefined-name@36). Lines 96-102 are the author's self-analysis and loopback amendment (2026-09-25, design 12.3), implemented by SS-ANALYSIS (design 14.5.9, repinned): `scope :master 512`, `spectrum :master bins: 64`, `let hit capture :drums 1` and `let out render 2` check clean (the M1 overload group and the new rows) and, since the fixture runner registers no `AnalysisCx`, fail host-unavailable@105/@99/@100/@101 at run time. The source forms `fft :master` and `amp :d1` are out of issue #4's scope (S2) and keep type-mismatch@103/@97 (run type@103, not-callable@104). Line 102 writes three alternatives as prose (`rms out  /  peak out  /  spectrum out bins: 64`), which reads as ONE `rms` call with extra arguments: type-mismatch@109 (arity) in the checker and arity@109 at run time. Line 107 `[1 0.5] > osc \"/trigger\"` puts a value list before `osc`: the VM takes the pattern-subject `osc` as the visual source and fails type@114 (the checker accepts it; recorded for the language author, not changed here). Pinned exactly so that implementing the amendment must update this entry. (2026-09-27: the full chord-vocabulary Decided note added 7 comment lines above; every line from 89 on shifted by 7.)"
+
+[[block]]
+doc = "design-music.md"
+ordinal = 3
+section = 3
+reader = "clean"
+reader_diags = []
+expand = "clean"
+expand_diags = []
+eval = "diagnostic"
+check_diags = ["sound-not-first@100", "sound-not-first@103", "sound-not-first@106", "type-mismatch@107", "type-mismatch@77", "type-mismatch@93", "undefined-name@82", "undefined-name@83", "undefined-name@84", "undefined-name@85", "undefined-name@86", "undefined-name@87", "undefined-name@88", "undefined-name@89", "undefined-name@90"]
+run_fails = ["arity@100", "arity@103", "arity@106", "arity@107", "arity@77", "not-callable@93", "undefined-name@82", "undefined-name@83", "undefined-name@84", "undefined-name@85", "undefined-name@86", "undefined-name@87", "undefined-name@88", "undefined-name@89", "undefined-name@90"]
+note = "Patterns. The chord line writes `[:g :dom7]` as in section 2, and Tidal's `struct` is spelled `grid` (design 20 Q3, Decided 2026-09-25). Eval: The SOUND FIRST chains, sinks, transforms, control patterns, combinators, signals and `grid` all run. Codes: `pat` is a placeholder name (undefined-name@82-90); the signal listing line `sine  saw ..` is a call (type-mismatch@93, not-callable); the lines ending `> s :piano` (@100, @106) and `> s :sawtooth` (@103) predate the Decided SOUND FIRST rule of section 1, so they are sound-not-first (arity at run time); `off {note [..]} ..` and `arp {chord [..]} :up` give a control no subject (type-mismatch, arity)."
+
+[[block]]
+doc = "design-music.md"
+ordinal = 4
+section = 4
+reader = "clean"
+reader_diags = []
+expand = "clean"
+expand_diags = []
+eval = "diagnostic"
+check_diags = []
+run_fails = ["type@4", "undefined-name@28", "undefined-name@29"]
+note = "Synthesis models: inst headers with pairs and typed parameters. Eval (BE-FINAL, TASK-008, fixture NoopHost): `inst analog`, `inst epiano` and `inst wt` realize to instruments, and their header parameters (`cutoff`, `position`) and `bank` run as pattern controls (M3, serial repair R1). Line 4 `inst drum: sampler bank: :bd-haus ...:` is the open spelling of question B3 (derive from a template, or define `sampler` itself): the definition head matches no clause (type@4), so `s :drum` on line 7 plays an unknown sound only at query time; the prelude templates use the plain header form (design 12.8.6). Lines 28-29 are the one-line `inst NAME: BODY` form (`inst pd: phase-distortion ..`, `inst organ: additive ..`): the checker reads them as definitions, but the compiler does not treat a one-line `inst` as a definition head, so `inst` itself is undefined-name@28/@29 at run time (recorded for the language author and TASK-009, not changed here)."
+
+[[block]]
+doc = "design-music.md"
+ordinal = 5
+section = 5
+reader = "clean"
+reader_diags = []
+expand = "clean"
+expand_diags = []
+eval = "positive"
+check_diags = []
+run_fails = []
+note = "Effects: bus and master blocks with continuation lines. Eval (BE-FINAL, TASK-008, fixture NoopHost): `bus :drums:` lowers to a three-unit `BusDef` (compressor > tape > plate), the slot routes into it with `bus :drums`, and `master:` lowers to the root bus; every form runs clean."
+
+[[block]]
+doc = "design-music.md"
+ordinal = 6
+section = 6
+reader = "diagnostics"
+reader_diags = ["unexpected-indent@3"]
+expand = "clean"
+expand_diags = []
+eval = "diagnostic"
+check_diags = ["unknown-keyword@5"]
+run_fails = ["inst-failed@7"]
+note = "Granular. Block line 3 continues the granular call without `>`, so it is unexpected-indent (6.5.4); the `inst cloud` statement it sits under becomes Error and is not checked or run. Eval (BE-FINAL, TASK-008, fixture NoopHost): line 5 `position {range perlin 0 1}` runs as a pattern control (M3, serial repair R1); `:perlin` is not a known signal keyword (unknown-keyword@5, check only). Line 7 `bus :texture:` fails inst-failed@7 because `freeze: {alt false true}` is a pattern, and a bus unit parameter takes a number, ugen, keyword or signal (12.8.6); line 9 routes into the bus name."
+
+[[case]]
+id = "canon-pipe-thought-order"
+doc = "lang-reference.md"
+file = "file"
+verbatim = true
+source = '+ 43 32 > * 12 > print'
+read = '(print (* (+ 43 32) 12))'
+expand = '(print (* (+ 43 32) 12))'
+diags = []
+annotation = "# thought order: 43+32, times 12, print"
+
+[[case]]
+id = "canon-group"
+doc = "lang-reference.md"
+file = "file"
+verbatim = true
+source = '* 12 {+ 43 32}'
+read = '(* 12 {(+ 43 32)})'
+expand = '(* 12 {(+ 43 32)})'
+diags = []
+annotation = "# ~ (* 12 (+ 43 32))  => 900"
+
+[[case]]
+id = "canon-pair"
+doc = "lang-reference.md"
+file = "file"
+verbatim = true
+source = 'amp: 0.5'
+read = '[:amp 0.5]'
+expand = '[:amp 0.5]'
+diags = []
+annotation = "# ~ [:amp 0.5]"
+
+[[case]]
+id = "canon-string-key-pair"
+doc = "lang-reference.md"
+file = "file"
+verbatim = true
+source = '"a": 1'
+read = '["a" 1]'
+expand = '["a" 1]'
+diags = []
+annotation = "# any literal key: ~ [\"a\" 1]"
+
+[[case]]
+id = "canon-dict-literal"
+doc = "lang-reference.md"
+file = "file"
+verbatim = true
+source = '[amp: 0.5 pan: -1]'
+read = '[[:amp 0.5] [:pan -1]]'
+expand = '[[:amp 0.5] [:pan -1]]'
+diags = []
+annotation = "# a dict; ~ [[:amp 0.5] [:pan -1]]"
+
+[[case]]
+id = "canon-named-args"
+doc = "lang-reference.md"
+file = "file"
+verbatim = true
+source = 'once {s :crash} at: 4 gain: 0.5'
+read = '(once {(s :crash)} [:at 4] [:gain 0.5])'
+expand = '(once {(s :crash)} [:at 4] [:gain 0.5])'
+diags = []
+annotation = "# ~ (once {s :crash} [:at 4] [:gain 0.5])"
+
+[[case]]
+id = "canon-let"
+doc = "lang-reference.md"
+file = "file"
+verbatim = true
+source = 'let a 12'
+read = '(let a 12)'
+expand = '(let a 12)'
+diags = []
+annotation = "# ~ (let a 12); immutable"
+
+[[case]]
+id = "canon-pipe-inline"
+doc = "lang-reference.md"
+file = "file"
+verbatim = true
+source = 'a > fn1 12 > fn2 32 43'
+read = '(fn2 (fn1 a 12) 32 43)'
+expand = '(fn2 (fn1 a 12) 32 43)'
+diags = []
+annotation = "# inline, the same thing"
+
+[[case]]
+id = "canon-pipe-continuation"
+doc = "lang-reference.md"
+file = "file"
+verbatim = true
+source = '''
+fn some-fn a:
+	fn1 a 12
+		> fn2 32 43'''
+read = '(fn some-fn a {(fn2 (fn1 a 12) 32 43)})'
+expand = '(fn some-fn a {(fn2 (fn1 a 12) 32 43)})'
+diags = []
+annotation = "# == fn2 {fn1 a 12} 32 43"
+
+[[case]]
+id = "canon-fallback-precedence"
+doc = "lang-reference.md"
+file = "file"
+verbatim = true
+source = 'd :gain ? 1.0 > * 2'
+read = '(* (#? (d :gain) 1.0) 2)'
+expand = '(* (or (d :gain) 1.0) 2)'
+diags = []
+annotation = "# `?` applies to the expression just to its left and binds tighter than `>`"
+
+[[case]]
+id = "canon-lambda"
+doc = "lang-reference.md"
+file = "file"
+verbatim = true
+source = 'x b -> * x b'
+read = '(-> (x b) (* x b))'
+expand = '(-> (x b) (* x b))'
+diags = []
+annotation = "# like |x, b| x * b in Rust"
+
+[[case]]
+id = "canon-lambda-in-group"
+doc = "lang-reference.md"
+file = "file"
+verbatim = true
+source = 'map arr {x -> * x 2}'
+read = '(map arr (-> (x) (* x 2)))'
+expand = '(map arr (-> (x) (* x 2)))'
+diags = []
+
+[[case]]
+id = "canon-if-block"
+doc = "lang-reference.md"
+file = "file"
+verbatim = true
+source = '''
+if {> a 10}:
+	print "big"'''
+read = '(if {(> a 10)} {(print "big")})'
+expand = '(match {(> a 10)} {(-> (false | nil) nil) (-> (_) {(print "big")})})'
+diags = []
+annotation = "# these two are identical"
+
+[[case]]
+id = "canon-if-inline-group"
+doc = "lang-reference.md"
+file = "file"
+verbatim = true
+source = 'if {> a 10} {print "big"}'
+read = '(if {(> a 10)} {(print "big")})'
+expand = '(match {(> a 10)} {(-> (false | nil) nil) (-> (_) {(print "big")})})'
+diags = []
+annotation = "# these two are identical"
+
+[[case]]
+id = "canon-neg"
+doc = "lang-reference.md"
+file = "file"
+verbatim = false
+source = 'print -x'
+read = '(print (#neg x))'
+expand = '(print (neg x))'
+diags = []
+annotation = "# `-x` is `{neg x}`; `- x` with a space is the function"
+
+[[case]]
+id = "canon-interp"
+doc = "lang-reference.md"
+file = "file"
+verbatim = true
+source = '"note {n} at beat {beat}"'
+read = '(#interp "note " n " at beat " beat)'
+expand = '(concat "note " n " at beat " beat)'
+diags = []
+
+[[case]]
+id = "canon-for-range"
+doc = "lang-reference.md"
+file = "file"
+verbatim = false
+source = '''
+for i 0..8:
+	print i'''
+read = '(for i (.. 0 8) {(print i)})'
+expand = '(match (map (.. 0 8) (-> (i) {(print i)})) {(-> (_) nil)})'
+diags = []
+
+[[case]]
+id = "canon-let-reads-rest"
+doc = "lang-reference.md"
+file = "file"
+verbatim = true
+source = 'let label if {> a 10} "big" "small"'
+read = '(let label (if {(> a 10)} "big" "small"))'
+expand = '(let label (match {(> a 10)} {(-> (false | nil) "small") (-> (_) "big")}))'
+diags = []
+annotation = "# `let` reads the rest of its line"
+
+[[case]]
+id = "sec2-splat-args"
+doc = "lang-reference.md"
+file = "file"
+verbatim = true
+source = 'once {s :crash} & p'
+read = '(once {(s :crash)} (& p))'
+expand = '(once {(s :crash)} (& p))'
+diags = []
+annotation = "# == once {s :crash} gain: 0.5 pan: -1"
+
+[[case]]
+id = "sec2-struct-construct"
+doc = "lang-reference.md"
+file = "file"
+verbatim = true
+source = 'let v voice note: 60 pan: -1'
+read = '(let v (voice [:note 60] [:pan -1]))'
+expand = '(let v (voice [:note 60] [:pan -1]))'
+diags = []
+annotation = "# construct: a plain call; `let` reads the rest of its line"
+
+[[case]]
+id = "sec3-if-value"
+doc = "lang-reference.md"
+file = "file"
+verbatim = true
+source = 'if {> a 10} "big" "small"'
+read = '(if {(> a 10)} "big" "small")'
+expand = '(match {(> a 10)} {(-> (false | nil) "small") (-> (_) "big")})'
+diags = []
+annotation = "# == match {> a 10}: false | nil -> \"small\"; _ -> \"big\""
+
+[[case]]
+id = "sec3-if-no-else"
+doc = "lang-reference.md"
+file = "file"
+verbatim = true
+source = 'let maybe if {> a 100} "huge"'
+read = '(let maybe (if {(> a 100)} "huge"))'
+expand = '(let maybe (match {(> a 100)} {(-> (false | nil) nil) (-> (_) "huge")}))'
+diags = []
+annotation = "# => nil when false"
+
+[[case]]
+id = "sec3-binding-if-inline"
+doc = "lang-reference.md"
+file = "file"
+verbatim = true
+source = 'if {d :gain} g -> once {s :bd} gain: g'
+read = '(-> (if {(d :gain)} g) (once {(s :bd)} [:gain g]))'
+expand = '(match {(d :gain)} {(-> (false | nil) nil) (-> (g) (once {(s :bd)} [:gain g]))})'
+diags = []
+annotation = "# g bound when {d :gain} is not nil"
+
+[[case]]
+id = "sec3-binding-if-block"
+doc = "lang-reference.md"
+file = "file"
+verbatim = true
+source = '''
+if {d :gain} g ->:
+	once {s :bd} gain: g
+else:
+	once {s :bd}'''
+read = '(#if-chain (-> (if {(d :gain)} g) {(once {(s :bd)} [:gain g])}) (else {(once {(s :bd)})}))'
+expand = '(match {(d :gain)} {(-> (false | nil) {(once {(s :bd)})}) (-> (g) {(once {(s :bd)} [:gain g])})})'
+diags = []
+annotation = "# == match {d :gain}: false | nil -> once {s :bd}; g -> once {s :bd} gain: g"
+
+[[case]]
+id = "sec3-binding-if-variant"
+doc = "lang-reference.md"
+file = "file"
+verbatim = true
+source = '''
+if {parse s} ok v ->:
+	print v
+else:
+	print "parse failed"'''
+read = '(#if-chain (-> (if {(parse s)} ok v) {(print v)}) (else {(print "parse failed")}))'
+expand = '(match {(parse s)} {(-> (ok v) {(print v)}) (-> (_) {(print "parse failed")})})'
+diags = []
+annotation = "# == match {parse s}: ok v -> print v; _ -> print \"parse failed\""
+
+[[case]]
+id = "sec3-if-elif-else"
+doc = "lang-reference.md"
+file = "file"
+verbatim = true
+source = '''
+if {> a 10}:
+	print "big"
+elif {> a 5}:
+	print "medium"
+else:
+	print "small"'''
+read = '(#if-chain (if {(> a 10)} {(print "big")}) (elif {(> a 5)} {(print "medium")}) (else {(print "small")}))'
+expand = '(match {(> a 10)} {(-> (false | nil) (match {(> a 5)} {(-> (false | nil) {(print "small")}) (-> (_) {(print "medium")})})) (-> (_) {(print "big")})})'
+diags = []
+annotation = "# multi-line form; `else:` and `elif cond:` align with `if`"
+
+[[case]]
+id = "sec3-for-statement"
+doc = "lang-reference.md"
+file = "file"
+verbatim = true
+source = '''
+for x arr:
+	print x'''
+read = '(for x arr {(print x)})'
+expand = '(match (map arr (-> (x) {(print x)})) {(-> (_) nil)})'
+diags = []
+annotation = "# `for pattern source: body` == `map source {pattern -> body}`"
+
+[[case]]
+id = "sec3-match-clauses"
+doc = "lang-reference.md"
+file = "file"
+verbatim = true
+source = '''
+match x:
+	:kick -> :bd-haus
+	:snare -> :sn-dub
+	_ -> nil'''
+read = '(match x {(-> (:kick) :bd-haus) (-> (:snare) :sn-dub) (-> (_) nil)})'
+expand = '(match x {(-> (:kick) :bd-haus) (-> (:snare) :sn-dub) (-> (_) nil)})'
+diags = []
+
+[[case]]
+id = "music-every-whenmod-chain"
+doc = "design-music.md"
+file = "file"
+verbatim = true
+source = '''
+s [:bd-haus :sn-dub]
+	> every 4 {p -> fast p 2}      # every fourth cycle, double time
+	> whenmod 8 6 rev              # cycles 6 and 7 of every 8, reversed
+	> d1'''
+read = '(d1 (whenmod (every (s [:bd-haus :sn-dub]) 4 (-> (p) (fast p 2))) 8 6 rev))'
+expand = '(d1 (whenmod (every (s [:bd-haus :sn-dub]) 4 (-> (p) (fast p 2))) 8 6 rev))'
+diags = []
+
+[[case]]
+id = "music-d1-three-spellings"
+doc = "design-music.md"
+file = "file"
+verbatim = true
+source = '''
+s [:bd :sd] > d1                   # pipe into the sink (principle 2)
+d1 {s [:bd :sd]}                   # plain call
+d1:                              # trailing block; the block's value is
+	s [:bd :sd]                      # its last expression, i.e. the pattern'''
+read = '''
+(d1 (s [:bd :sd]))
+(d1 {(s [:bd :sd])})
+(d1 {(s [:bd :sd])})'''
+expand = '''
+(d1 (s [:bd :sd]))
+(d1 {(s [:bd :sd])})
+(d1 {(s [:bd :sd])})'''
+diags = []
+annotation = "# Three spellings of the same call"
+
+[[case]]
+id = "music-slot-drums"
+doc = "design-music.md"
+file = "file"
+verbatim = true
+source = '''
+slot :drums:
+	s [:bd :sd]'''
+read = '(slot :drums {(s [:bd :sd])})'
+expand = '(slot :drums {(s [:bd :sd])})'
+diags = []
+annotation = "# `d1 == slot 1`"
+
+[[case]]
+id = "music-inst-pluck-header"
+doc = "design-music.md"
+file = "file"
+verbatim = true
+source = '''
+inst pluck freq: float = 440 amp: float = 0.5 cutoff: float = 2000:
+	saw freq
+		> lpf cutoff
+		> * {env-perc 0.01 0.3}
+		> * amp'''
+read = '(inst pluck [:freq float] = 440 [:amp float] = 0.5 [:cutoff float] = 2000 {(* (* (lpf (saw freq) cutoff) {(env-perc 0.01 0.3)}) amp)})'
+expand = '(inst pluck [:freq float] = 440 [:amp float] = 0.5 [:cutoff float] = 2000 {(* (* (lpf (saw freq) cutoff) {(env-perc 0.01 0.3)}) amp)})'
+diags = []
+
+[[case]]
+id = "music-control-patterns"
+doc = "design-music.md"
+file = "file"
+verbatim = true
+source = '''
+d1:
+	s [:bd :sd]
+		> n [0 1 2 3]
+		> gain [1 0.8 0.6]
+		> pan sine
+		> speed {alt 1 2}
+		> lpf {range sine 200 2000}'''
+read = '(d1 {(lpf (speed (pan (gain (n (s [:bd :sd]) [0 1 2 3]) [1 0.8 0.6]) sine) {(alt 1 2)}) {(range sine 200 2000)})})'
+expand = '(d1 {(lpf (speed (pan (gain (n (s [:bd :sd]) [0 1 2 3]) [1 0.8 0.6]) sine) {(alt 1 2)}) {(range sine 200 2000)})})'
+diags = []
+
+[[case]]
+id = "music-chord-seven-conflict"
+doc = "design-music.md"
+file = "file"
+verbatim = false
+source = 'chord {alt [:c :maj7] [:d :m7] [:g :7]}'
+read = '(#error)'
+diags = ["misplaced-colon"]
+note = "Negative case. The conflict is resolved (Decided 2026-09-25): design-music.md now writes `[:g :dom7]`. `:7` still breaks the Decided identifier rule (no leading digit), so 6.5.4 reads the colon as misplaced-colon; src/reader/tests/lexer.rs keeps the same assertion."
+
+[[case]]
+id = "neg-paren-form"
+doc = "lang-reference.md"
+file = "file"
+verbatim = false
+source = '''
+( + 1 2 )
+print 1'''
+read = '''
+(#error)
+(print 1)'''
+diags = ["paren-form"]
+annotation = "# `( )` is a reader error"
+
+[[case]]
+id = "neg-underscore-name"
+doc = "lang-reference.md"
+file = "file"
+verbatim = false
+source = '''
+let _tmp 1
+print 1'''
+read = '''
+(#error)
+(print 1)'''
+diags = ["bad-identifier"]
+annotation = "# not identifiers: _tmp"
+
+[[case]]
+id = "neg-trailing-dash"
+doc = "lang-reference.md"
+file = "file"
+verbatim = false
+source = '''
+let foo- 1
+print 1'''
+read = '''
+(#error)
+(print 1)'''
+diags = ["bad-identifier"]
+annotation = "# `foo-` is not a name"
+
+[[case]]
+id = "neg-console-register-in-file"
+doc = "lang-reference.md"
+file = "file"
+verbatim = false
+source = '''
+print _1
+print 1'''
+read = '''
+(#error)
+(print 1)'''
+diags = ["console-register-in-file"]
+annotation = "# In a file it is a reader error"
+
+[[case]]
+id = "console-register-in-console"
+doc = "lang-reference.md"
+file = "console"
+verbatim = false
+source = '''
+print _1
+print 1'''
+read = '''
+(print _1)
+(print 1)'''
+expand = '''
+(print _1)
+(print 1)'''
+diags = []
+annotation = "# `_1` (the previous value) exists ONLY in the console"
+
+[[case]]
+id = "u2-gt-statement-level"
+doc = "lang-reference.md"
+file = "file"
+verbatim = false
+source = '> a 10'
+read = '(> a 10)'
+expand = '(> a 10)'
+diags = []
+note = "U2 pin (design 6.5.4): a line-initial `>` at statement level is in head position; the pipe-continuation cases pin the deeper-indented reading."
+
+[[case]]
+id = "aq-fn-arity"
+doc = "lang-reference.md"
+file = "file"
+verbatim = true
+source = '''
+fn f a b:
+	* a 12            # ~ (* a 12)
+
+# function call: prefix, no parens, no commas
+f 1 2               # => 24'''
+read = '''
+(fn f a b {(* a 12)})
+(f 1 2)'''
+expand = '''
+(fn f a b {(* a 12)})
+(f 1 2)'''
+diags = []
+annotation = "# => 24"
+class = "authority-question"
+question = "fn f a b takes two parameters and returns * a 12; is f 1 2 => 24 the intended arity and value?"
+
+[[case]]
+id = "aq-let-upd-base"
+doc = "lang-reference.md"
+file = "file"
+verbatim = true
+source = '''
+let base 60
+let line s :pluck > note [base {+ base 7}]   # depends on base
+line > d1                                    # d1 depends on line
+upd base 62'''
+read = '''
+(let base 60)
+(let line (note (s :pluck) [base {(+ base 7)}]))
+(d1 line)
+(upd base 62)'''
+expand = '''
+(let base 60)
+(let line (note (s :pluck) [base {(+ base 7)}]))
+(d1 line)
+(upd base 62)'''
+diags = []
+annotation = "# line and d1's pattern update"
+class = "authority-question"
+question = "section 4 applies upd to a name bound by let, while section 1 says only a var may be upd'd."
+
+[[case]]
+id = "u4-inline-fn-body"
+doc = "lang-reference.md"
+file = "file"
+verbatim = false
+source = 'fn kick-sound: :bd-haus'
+read = '(fn [:kick-sound :bd-haus])'
+diags = ["malformed-fn"]
+note = "U4: fn bodies are block form only. 6.5.4 reads `kick-sound: :bd-haus` as a pair; the expander reports malformed-fn."
+
+[[case]]
+id = "import-default-prefix"
+doc = "lang-reference.md"
+file = "file"
+verbatim = true
+source = 'import github.com/someone/vactr-pads'
+read = '(#import "github.com/someone/vactr-pads")'
+expand = '(#import "github.com/someone/vactr-pads")'
+diags = []
+annotation = "# qualified: pads.warm"
+
+[[case]]
+id = "import-alias"
+doc = "lang-reference.md"
+file = "file"
+verbatim = true
+source = 'import github.com/someone/vactr-pads as pd'
+read = '(#import "github.com/someone/vactr-pads" as pd)'
+expand = '(#import "github.com/someone/vactr-pads" as pd)'
+diags = []
+annotation = "# alias"
+
+[[case]]
+id = "import-open"
+doc = "lang-reference.md"
+file = "file"
+verbatim = true
+source = 'import github.com/someone/vactr-pads open'
+read = '(#import "github.com/someone/vactr-pads" open)'
+expand = '(#import "github.com/someone/vactr-pads" open)'
+diags = []
+annotation = "# names unqualified"
+
+[[case]]
+id = "import-fresh-document"
+doc = "lang-reference.md"
+file = "file"
+verbatim = false
+source = '''
+import github.com/someone/vactr-pads
+s pads.warm > note [:c3] > d1'''
+read = '''
+(#import "github.com/someone/vactr-pads")
+(d1 (note (s pads.warm) [:c3]))'''
+expand = '''
+(#import "github.com/someone/vactr-pads")
+(d1 (note (s pads.warm) [:c3]))'''
+diags = []
+note = "Import-then-use in one fresh document (5.7 two-phase frontend)."
+
+[[case]]
+id = "import-fresh-alias"
+doc = "lang-reference.md"
+file = "file"
+verbatim = false
+source = '''
+import github.com/someone/vactr-pads as pd
+s pd.warm > note [:c3] > d1'''
+read = '''
+(#import "github.com/someone/vactr-pads" as pd)
+(d1 (note (s pd.warm) [:c3]))'''
+expand = '''
+(#import "github.com/someone/vactr-pads" as pd)
+(d1 (note (s pd.warm) [:c3]))'''
+diags = []
+
+[[case]]
+id = "unbound-qualifier"
+doc = "lang-reference.md"
+file = "file"
+verbatim = true
+source = 's pads.warm > note [:c3] > d1'
+read = '(#error)'
+diags = ["unbound-qualifier"]
+note = "Read with no import before it: the qualifier is unbound."
+
+[[case]]
+id = "directive-trivia"
+doc = "lang-reference.md"
+file = "file"
+verbatim = false
+source = '''
+#@ panel: gain
+let g 1'''
+read = '(let g 1)'
+expand = '(let g 1)'
+diags = []
+note = "`#@` lines are trivia with spans (unit tests check the spans)."
+
+[[case]]
+id = "u5-bare-variant-binding-if"
+doc = "lang-reference.md"
+file = "file"
+verbatim = false
+source = 'if x none -> 1'
+read = '(-> (if x none) 1)'
+expand = '(match x {(-> (false | nil) nil) (-> (none) 1)})'
+diags = []
+note = "U5 (answered): the expander keeps the syntactic binding-if desugaring. When `none` is a field-less variant, a truthy value that is not `none` fails the match instead of taking the else branch; the checker (TASK-004) must diagnose a bare field-less variant used as the binding pattern of `if`. The expander implements no such diagnostic."
+
+# ---- Evaluation cases (design 7.1.7, ME-INTEGRATE) --------------------------
+# `value` is the canonical print of the LAST form, `fail` its FailCode;
+# `check_diags` are the errors and warnings of checking the whole source as one
+# document (`code@line`, never hints); `run_fails` are failures of earlier forms;
+# `query_values`/`query_faults` are the event values and fault codes of querying
+# cycle 0 of the last value. Each case runs in a fresh Evaluator.
+# annotation says 24, but the spec body is `* a 12`, so `f 1 2` is 12 (src/vm/tests/natives.rs pipeline_cases agrees)
+# spec line 71
+[[case]]
+id = "eval-fn-call"
+doc = "lang-reference.md"
+file = "file"
+verbatim = false
+source = '''
+fn f a b:
+	* a 12
+f 1 2'''
+value = "12"
+check_diags = []
+annotation = "# => 24"
+
+# runtime returns the argument; the native signature types print as `fn any -> nil`
+# spec line 125
+[[case]]
+id = "eval-print-returns-arg"
+doc = "lang-reference.md"
+file = "file"
+verbatim = false
+source = '''
+let a 12
+print a'''
+value = "12"
+check_diags = []
+annotation = "# => 12; print returns its argument"
+
+# spec line 137
+[[case]]
+id = "eval-list-index"
+doc = "lang-reference.md"
+file = "file"
+verbatim = false
+source = '''
+let a 12
+let arr [a 12 44]
+arr 1'''
+value = "12"
+check_diags = []
+annotation = "# => 12"
+
+# spec line 139
+[[case]]
+id = "eval-repeat"
+doc = "lang-reference.md"
+file = "file"
+verbatim = true
+source = 'repeat 4 3'
+value = "[4 4 4]"
+check_diags = []
+annotation = "# => [4 4 4]; the same `repeat` as in sequences"
+
+# spec line 176
+[[case]]
+id = "eval-int-div-ratio"
+doc = "lang-reference.md"
+file = "file"
+verbatim = true
+source = '/ 1 3'
+value = "1/3"
+check_diags = []
+annotation = "# => 1/3; int / int is a ratio (Clojure)"
+
+# spec line 181
+[[case]]
+id = "eval-ratio-add"
+doc = "lang-reference.md"
+file = "file"
+verbatim = true
+source = '+ 1/4 1/8'
+value = "3/8"
+check_diags = []
+annotation = "# => 3/8; ratio arithmetic is exact and self-reducing"
+
+# spec line 182
+[[case]]
+id = "eval-ratio-integral"
+doc = "lang-reference.md"
+file = "file"
+verbatim = true
+source = '* 1/4 4'
+value = "1"
+check_diags = []
+annotation = "# => 1; an integral ratio prints as an int"
+
+# spec line 183
+[[case]]
+id = "eval-div-reduces"
+doc = "lang-reference.md"
+file = "file"
+verbatim = true
+source = '/ 6 4'
+value = "3/2"
+check_diags = []
+annotation = "# => 3/2"
+
+# spec line 184
+[[case]]
+id = "eval-ratio-times-float"
+doc = "lang-reference.md"
+file = "file"
+verbatim = true
+source = '* 1/3 0.5'
+value = "0.16666667"
+check_diags = []
+annotation = "# => 0.16666667 float; a float in the expression"
+
+# spec line 186
+[[case]]
+id = "eval-float-of-ratio"
+doc = "lang-reference.md"
+file = "file"
+verbatim = true
+source = 'float 1/3'
+value = "0.33333334"
+check_diags = []
+annotation = "# => 0.33333334, explicit"
+
+# spec line 197
+[[case]]
+id = "eval-int-plus-float"
+doc = "lang-reference.md"
+file = "file"
+verbatim = true
+source = '+ 1 2.5'
+value = "3.5"
+check_diags = []
+annotation = "# => 3.5 float"
+
+# spec line 198
+[[case]]
+id = "eval-int-times-float"
+doc = "lang-reference.md"
+file = "file"
+verbatim = true
+source = '* 60 1.5'
+value = "90.0"
+check_diags = []
+annotation = "# => 90.0 float"
+
+# spec line 199
+[[case]]
+id = "eval-int-truncates"
+doc = "lang-reference.md"
+file = "file"
+verbatim = true
+source = 'int 90.7'
+value = "90"
+check_diags = []
+annotation = "# => 90 (truncates); `round 90.7` => 91"
+
+# extra case: the inline `round 90.7` => 91 claim of the same annotation line
+# spec line 199
+[[case]]
+id = "eval-round"
+doc = "lang-reference.md"
+file = "file"
+verbatim = true
+source = 'round 90.7'
+value = "91"
+check_diags = []
+annotation = "# => 90 (truncates); `round 90.7` => 91"
+
+# `d` is not bound before this line in the spec; the section-2 dict `[amp: 0.5 pan: -1]` is used
+# spec line 228
+[[case]]
+id = "eval-dict-missing-nil"
+doc = "lang-reference.md"
+file = "file"
+verbatim = false
+source = '''
+let d [amp: 0.5 pan: -1]
+d :missing'''
+value = "nil"
+check_diags = []
+annotation = "# => nil"
+
+# spec line 229
+[[case]]
+id = "eval-first-empty"
+doc = "lang-reference.md"
+file = "file"
+verbatim = true
+source = 'first []'
+value = "nil"
+check_diags = []
+annotation = "# => nil when empty"
+
+# spec line 230
+[[case]]
+id = "eval-if-no-else"
+doc = "lang-reference.md"
+file = "file"
+verbatim = true
+source = 'if false "x"'
+value = "nil"
+check_diags = []
+annotation = "# => nil (no else)"
+
+# spec line 236
+[[case]]
+id = "eval-first-nil"
+doc = "lang-reference.md"
+file = "file"
+verbatim = true
+source = 'first nil'
+value = "nil"
+check_diags = []
+annotation = "# => nil"
+
+# spec line 237
+[[case]]
+id = "eval-nil-index"
+doc = "lang-reference.md"
+file = "file"
+verbatim = true
+source = 'nil 3'
+value = "nil"
+check_diags = []
+annotation = "# => nil (a list is callable with an index)"
+
+# spec line 238
+[[case]]
+id = "eval-nil-key"
+doc = "lang-reference.md"
+file = "file"
+verbatim = true
+source = 'nil :k'
+value = "nil"
+check_diags = []
+annotation = "# => nil"
+
+# spec line 239
+[[case]]
+id = "eval-len-nil"
+doc = "lang-reference.md"
+file = "file"
+verbatim = true
+source = 'len nil'
+value = "0"
+check_diags = []
+annotation = "# => 0"
+
+# spec line 241
+[[case]]
+id = "eval-or-first-truthy"
+doc = "lang-reference.md"
+file = "file"
+verbatim = true
+source = 'or nil 0 5'
+value = "0"
+check_diags = []
+annotation = "# => 0   (first truthy)"
+
+# spec line 242
+[[case]]
+id = "eval-and-first-falsy"
+doc = "lang-reference.md"
+file = "file"
+verbatim = true
+source = 'and 1 2 nil 3'
+value = "nil"
+check_diags = []
+annotation = "# => nil (first falsy, else last)"
+
+# spec line 359
+[[case]]
+id = "eval-dict-lookup"
+doc = "lang-reference.md"
+file = "file"
+verbatim = false
+source = '''
+let d [amp: 0.5 pan: -1]
+d :amp'''
+value = "0.5"
+check_diags = []
+annotation = "# => 0.5"
+
+# spec line 360
+[[case]]
+id = "eval-dict-lookup-missing"
+doc = "lang-reference.md"
+file = "file"
+verbatim = false
+source = '''
+let d [amp: 0.5 pan: -1]
+d :gain'''
+value = "nil"
+check_diags = []
+annotation = "# => nil for a missing key"
+
+# spec line 361
+[[case]]
+id = "eval-dict-default"
+doc = "lang-reference.md"
+file = "file"
+verbatim = false
+source = '''
+let d [amp: 0.5 pan: -1]
+d :gain ? 1.0'''
+value = "1.0"
+check_diags = []
+annotation = "# => 1.0; `?` is the default (no `get`)"
+
+# spec line 365
+[[case]]
+id = "eval-map-dict"
+doc = "lang-reference.md"
+file = "file"
+verbatim = false
+source = '''
+let d [amp: 0.5 pan: -1]
+map d {[k v] -> v}'''
+value = "[0.5 -1]"
+check_diags = []
+annotation = "# => [0.5 -1]"
+
+# spec line 366
+[[case]]
+id = "eval-first-dict"
+doc = "lang-reference.md"
+file = "file"
+verbatim = false
+source = '''
+let d [amp: 0.5 pan: -1]
+first d'''
+value = "[:amp 0.5]"
+check_diags = []
+annotation = "# => [:amp 0.5], the smallest key"
+
+# spec line 371
+[[case]]
+id = "eval-put-list"
+doc = "lang-reference.md"
+file = "file"
+verbatim = true
+source = 'put [1 2] 3 4'
+value = "[1 2 3 4]"
+check_diags = []
+annotation = "# => [1 2 3 4]"
+
+# spec line 372
+[[case]]
+id = "eval-put-dict-replace"
+doc = "lang-reference.md"
+file = "file"
+verbatim = false
+source = '''
+let d [amp: 0.5 pan: -1]
+put d amp: 0.7'''
+value = "[amp: 0.7 pan: -1]"
+check_diags = []
+annotation = "# => [amp: 0.7 pan: -1]; replaced"
+
+# annotation shows amp: 0.7, but `put d amp: 0.7` on the line above does not change the immutable d; the bindings give amp: 0.5 (src/vm/tests/natives.rs agrees)
+# spec line 373
+[[case]]
+id = "eval-put-dict-add"
+doc = "lang-reference.md"
+file = "file"
+verbatim = false
+source = '''
+let d [amp: 0.5 pan: -1]
+put d gain: 1.0 pan: 0'''
+value = "[amp: 0.5 gain: 1.0 pan: 0]"
+check_diags = []
+annotation = "# => [amp: 0.7 gain: 1.0 pan: 0]; key order"
+
+# spec line 377
+[[case]]
+id = "eval-join-lists"
+doc = "lang-reference.md"
+file = "file"
+verbatim = true
+source = 'join [[1 2] [3]]'
+value = "[1 2 3]"
+check_diags = []
+annotation = "# => [1 2 3]"
+
+# spec line 403
+[[case]]
+id = "eval-struct-field"
+doc = "lang-reference.md"
+file = "file"
+verbatim = false
+source = '''
+struct voice:
+	amp 1.0
+	pan 0
+	note
+let v voice note: 60 pan: -1
+v :amp'''
+value = "1.0"
+check_diags = []
+annotation = "# => 1.0; same access as a dict"
+
+# the checker reports an unknown literal struct field as unknown-keyword (src/types/infer_call.rs field_access); there is no unknown-field diagnostic code
+# spec line 404
+[[case]]
+id = "eval-struct-unknown-field"
+doc = "lang-reference.md"
+file = "file"
+verbatim = false
+source = '''
+struct voice:
+	amp 1.0
+	pan 0
+	note
+let v voice note: 60 pan: -1
+v :nope'''
+fail = "unknown-field"
+check_diags = ["unknown-keyword@6"]
+annotation = "# => error: not a field of voice (closed)"
+
+# "a voice": the concrete struct value; struct fields print sorted by key name
+# spec line 405
+[[case]]
+id = "eval-struct-put"
+doc = "lang-reference.md"
+file = "file"
+verbatim = false
+source = '''
+struct voice:
+	amp 1.0
+	pan 0
+	note
+let v voice note: 60 pan: -1
+put v amp: 0.5'''
+value = "voice amp: 0.5 note: 60 pan: -1"
+check_diags = []
+annotation = "# => a voice; an unknown key is an error"
+
+# spec line 445
+[[case]]
+id = "eval-index-past-end"
+doc = "lang-reference.md"
+file = "file"
+verbatim = false
+source = '''
+let xs [1 2 3]
+xs 99'''
+value = "nil"
+check_diags = []
+annotation = "# => nil (index past the end)"
+
+# second `d :missing` annotation (errors subsection); `d` is the section-2 dict
+# spec line 446
+[[case]]
+id = "eval-dict-missing-nil-errors"
+doc = "lang-reference.md"
+file = "file"
+verbatim = false
+source = '''
+let d [amp: 0.5 pan: -1]
+d :missing'''
+value = "nil"
+check_diags = []
+annotation = "# => nil"
+
+# the value is a Range, which prints as `0..8` (design 6.5.3 print format); the annotation lists its elements. `take 0..8 100` would print [0 1 2 3 4 5 6 7]
+# spec line 465
+[[case]]
+id = "eval-range"
+doc = "lang-reference.md"
+file = "file"
+verbatim = true
+source = '0..8'
+value = "0..8"
+check_diags = []
+annotation = "# => [0 1 2 3 4 5 6 7]"
+
+# spec line 471
+[[case]]
+id = "eval-add-variadic"
+doc = "lang-reference.md"
+file = "file"
+verbatim = true
+source = '+ 1 2 3'
+value = "6"
+check_diags = []
+annotation = "# => 6"
+
+# spec line 472
+[[case]]
+id = "eval-eq"
+doc = "lang-reference.md"
+file = "file"
+verbatim = false
+source = '''
+let a 12
+= a 12'''
+value = "true"
+check_diags = []
+annotation = "# => true"
+
+# with a = 12 the value is the string "big"; a string prints raw (unquoted) at top level
+# spec line 489
+[[case]]
+id = "eval-if-else"
+doc = "lang-reference.md"
+file = "file"
+verbatim = false
+source = '''
+let a 12
+if {> a 10} "big" "small"'''
+value = "big"
+check_diags = []
+annotation = "# => \"big\" or \"small\""
+
+# a let form yields the bound value; with a = 12 the condition is false
+# spec line 548
+[[case]]
+id = "eval-let-if-missing-else"
+doc = "lang-reference.md"
+file = "file"
+verbatim = false
+source = '''
+let a 12
+let maybe if {> a 100} "huge"'''
+value = "nil"
+check_diags = []
+annotation = "# => nil when false"
+
+# spec line 627
+[[case]]
+id = "eval-variant-eq"
+doc = "lang-reference.md"
+file = "file"
+verbatim = false
+source = '''
+enum shape:
+	circle r
+	rect w h
+	none
+= {circle 5} {circle 5}'''
+value = "true"
+check_diags = []
+annotation = "# => true; structural equality"
+
+# spec line 631
+[[case]]
+id = "eval-variant-field"
+doc = "lang-reference.md"
+file = "file"
+verbatim = false
+source = '''
+enum shape:
+	circle r
+	rect w h
+	none
+let c circle 5
+c :r'''
+value = "5"
+check_diags = []
+annotation = "# => 5"
+
+# annotation says [2 24 88] (as if a = 1), but arr = [a 12 44] with a = 12 (section 1, and reduce => 68 below) gives [24 24 88]
+# spec line 671
+[[case]]
+id = "eval-map-list"
+doc = "lang-reference.md"
+file = "file"
+verbatim = false
+source = '''
+let a 12
+let arr [a 12 44]
+map arr {x -> * x 2}'''
+value = "[24 24 88]"
+check_diags = []
+annotation = "# => [2 24 88]"
+
+# spec line 672
+[[case]]
+id = "eval-filter"
+doc = "lang-reference.md"
+file = "file"
+verbatim = false
+source = '''
+let a 12
+let arr [a 12 44]
+filter arr {x -> > x 20}'''
+value = "[44]"
+check_diags = []
+annotation = "# => [44]"
+
+# spec line 673
+[[case]]
+id = "eval-reduce"
+doc = "lang-reference.md"
+file = "file"
+verbatim = false
+source = '''
+let a 12
+let arr [a 12 44]
+reduce arr 0 {acc x -> + acc x}'''
+value = "68"
+check_diags = []
+annotation = "# => 68"
+
+# "44, the first match, or nil": arr has a match, so 44
+# spec line 674
+[[case]]
+id = "eval-find"
+doc = "lang-reference.md"
+file = "file"
+verbatim = false
+source = '''
+let a 12
+let arr [a 12 44]
+find arr {x -> > x 20}'''
+value = "44"
+check_diags = []
+annotation = "# => 44, the first match, or nil"
+
+# spec line 675
+[[case]]
+id = "eval-any"
+doc = "lang-reference.md"
+file = "file"
+verbatim = false
+source = '''
+let a 12
+let arr [a 12 44]
+any arr {x -> > x 20}'''
+value = "true"
+check_diags = []
+annotation = "# => true"
+
+# spec line 676
+[[case]]
+id = "eval-all"
+doc = "lang-reference.md"
+file = "file"
+verbatim = false
+source = '''
+let a 12
+let arr [a 12 44]
+all arr {x -> > x 20}'''
+value = "false"
+check_diags = []
+annotation = "# => false"
+
+# spec line 677
+[[case]]
+id = "eval-take-open-range"
+doc = "lang-reference.md"
+file = "file"
+verbatim = true
+source = 'take 0.. 3'
+value = "[0 1 2]"
+check_diags = []
+annotation = "# => [0 1 2]; `0..` is lazy and infinite"
+
+# spec line 678
+[[case]]
+id = "eval-take-while"
+doc = "lang-reference.md"
+file = "file"
+verbatim = true
+source = 'take-while 0.. {x -> < x 3}'
+value = "[0 1 2]"
+check_diags = []
+annotation = "# => [0 1 2]"
+
+# the annotation writes `a` symbolically; a = 12, and a let is a snapshot, so the item is 12
+# spec line 679
+[[case]]
+id = "eval-enumerate"
+doc = "lang-reference.md"
+file = "file"
+verbatim = false
+source = '''
+let a 12
+let arr [a 12 44]
+enumerate arr'''
+value = "[[0 12] [1 12] [2 44]]"
+check_diags = []
+annotation = "# => [[0 a] [1 12] [2 44]]"
+
+# spec line 442
+[[case]]
+id = "eval-neg-type-add"
+doc = "lang-reference.md"
+file = "file"
+verbatim = true
+source = '+ 1 "a"'
+fail = "type"
+check_diags = ["type-mismatch@1"]
+annotation = "# fails (type)"
+
+# extra annotated negative; the checker flags a literal zero divisor (src/types/infer_call.rs)
+# spec line 441
+[[case]]
+id = "eval-neg-div-zero"
+doc = "lang-reference.md"
+file = "file"
+verbatim = true
+source = '/ 1 0'
+fail = "division-by-zero"
+check_diags = ["literal-division-by-zero@1"]
+annotation = "# fails (division by zero)"
+
+# `?T` used as `T`; at runtime `+ nil 1` fails with type
+# spec line 247
+[[case]]
+id = "eval-neg-optional-as-value"
+doc = "lang-reference.md"
+file = "file"
+verbatim = false
+source = '''
+let d [amp: 0.5 pan: -1]
++ {d :gain} 1'''
+fail = "type"
+check_diags = ["optional-as-value@2"]
+annotation = "# `T`: `+ {d :gain} 1` is a type diagnostic, `+ {d :gain ? 1.0} 1` is"
+
+# a check error only; the run still defines a (DefGlobal replaces the slot) and the let yields 13
+# spec line 83
+[[case]]
+id = "eval-neg-rebinding"
+doc = "lang-reference.md"
+file = "file"
+verbatim = false
+source = '''
+let a 12
+let a 13'''
+value = "13"
+check_diags = ["rebinding@2"]
+annotation = "# error: a is already bound in this scope"
+
+# extra annotated negative; runtime value assumes the second var line replaces the slot like let (unverified against the Evaluator)
+# spec line 84
+[[case]]
+id = "eval-neg-var-rebinding"
+doc = "lang-reference.md"
+file = "file"
+verbatim = false
+source = '''
+var hits 0
+var hits 5'''
+value = "5"
+check_diags = ["rebinding@2"]
+annotation = "# error: hits exists; write `upd hits 5`"
+
+# spec line 81
+[[case]]
+id = "eval-neg-upd-let"
+doc = "lang-reference.md"
+file = "file"
+verbatim = false
+source = '''
+let a 12
+upd a 13'''
+fail = "upd-immutable"
+check_diags = ["upd-immutable@2"]
+annotation = "# error: a is a let"
+
+# ---- Scope, SOUND FIRST and sound-kit cases (design 7.1.4, 7.1.7) ----------
+
+[[case]]
+id = "eval-scope-let-twice"
+doc = "lang-reference.md"
+file = "file"
+verbatim = false
+source = '''
+let a 1
+let a 1'''
+value = "1"
+check_diags = ["rebinding@2"]
+annotation = "# the same name bound twice in one scope is rebinding (checked as one document)"
+
+[[case]]
+id = "eval-scope-fn-param-shadows-session"
+doc = "lang-reference.md"
+file = "file"
+verbatim = false
+source = '''
+let x 1
+fn f x:
+	* x 2
+f 3'''
+value = "6"
+check_diags = ["shadowing@2"]
+annotation = "# a fn parameter shadowing a user-defined parent name is a warning"
+
+[[case]]
+id = "eval-sound-first-n"
+doc = "design-music.md"
+file = "file"
+verbatim = false
+source = 'n [0 3] > s :bd > d1'
+fail = "arity"
+check_diags = ["sound-not-first@1"]
+annotation = "# SOUND FIRST: `n [..] > s :x` is an error (s takes a sound, not a pattern)"
+
+[[case]]
+id = "eval-sound-first-note"
+doc = "design-music.md"
+file = "file"
+verbatim = false
+source = 'note [:c] > s :x > d1'
+fail = "arity"
+check_diags = ["sound-not-first@1"]
+annotation = "# SOUND FIRST: `note [..] > s :x` is an error"
+
+[[case]]
+id = "eval-sound-unknown-keyword"
+doc = "design-music.md"
+file = "file"
+verbatim = false
+source = 's :not-a-sound > d1'
+value = "<pattern>"
+check_diags = ["unknown-keyword@1"]
+query_faults = ["unknown-sound"]
+annotation = "# a keyword outside default-sound-kit is unknown-keyword; check never gates run"
+
+[[case]]
+id = "eval-sound-kit-arg-missing-key"
+doc = "design-music.md"
+file = "file"
+verbatim = false
+source = 's :bd909 kit: [bd: {sample ./bd.wav}] > d1'
+value = "<pattern>"
+check_diags = []
+query_faults = ["unknown-sound"]
+annotation = "# kit: skips the static check; the query fails event-locally with unknown-sound"
+
+[[case]]
+id = "eval-sound-kit-arg-tr909"
+doc = "design-music.md"
+file = "file"
+verbatim = false
+source = '''
+let tr909 [bd909: {sample ./tr909/bd.wav} sd909: {sample ./tr909/sd.wav}]
+s [:bd909 :sd909] kit: tr909 > d1'''
+value = "<pattern>"
+check_diags = []
+query_values = ["(sound ./tr909/bd.wav)", "(sound ./tr909/sd.wav)"]
+annotation = "# s [:bd :sd] kit: tr909 > d1, with keys outside default-sound-kit"
+
+[[case]]
+id = "eval-sound-value-kick"
+doc = "design-music.md"
+file = "file"
+verbatim = false
+source = '''
+let kick sample ./kick.wav
+s kick > d1'''
+value = "<pattern>"
+check_diags = []
+query_values = ["(sound ./kick.wav)"]
+annotation = "# a bound sound value is used as is, with no kit lookup"
+
+[[case]]
+id = "eval-sound-kit-override"
+doc = "design-music.md"
+file = "file"
+verbatim = false
+source = '''
+let sound-kit put default-sound-kit [bd: {sample ./bd/909.wav}]
+s :bd > n [0 3] > d1'''
+value = "<pattern>"
+check_diags = []
+query_values = ["(sound ./bd/909.wav)", "(sound ./bd/909.wav)"]
+annotation = "# the design-music section 2 override line, then a pattern that hears it (one shadows-prelude hint)"
+
+[[case]]
+id = "eval-sound-midi-out"
+doc = "design-music.md"
+file = "file"
+verbatim = true
+source = 's {midi 1} > note [:c :e :g] > d1'
+value = "<pattern>"
+check_diags = []
+query_values = ["(sound midi 1)", "(sound midi 1)", "(sound midi 1)"]
+annotation = "# MIDI out is an instrument; d1 is the sink"

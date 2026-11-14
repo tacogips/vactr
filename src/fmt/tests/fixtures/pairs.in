@@ -1,0 +1,3 @@
+slot :drums gain: 0.8:
+	let name value
+let pair name: value
